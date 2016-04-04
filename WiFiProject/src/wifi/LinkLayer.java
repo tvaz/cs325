@@ -44,7 +44,13 @@ public class LinkLayer implements Dot11Interface {
 	public int recv(Transmission t) {
 		output.println("LinkLayer: Pretending to block on recv()");
 		while(!theRF.dataWaiting()){
-			//some wait thing
+			try{
+				wait(1454);
+			}
+			catch(InterruptedException e)
+			{
+				
+			}
 		}
 		Packet temp = new Packet(theRF.receive());
 		if(temp.getDestAddr() == ourMAC){
