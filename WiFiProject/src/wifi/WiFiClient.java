@@ -33,11 +33,11 @@ import javax.swing.SwingUtilities;
  * Care is taken to ensure that all GUI-servicing operations occur in the event-dispatching
  * thread while all interactions with 802.11~ code occur in separate threads.  Thus the
  * constructor doesn't actually create the GUI &mdash; that happens in buildGUI() which is
- * called from the client's run() method.  (The run() method also starts up a thread to 
- * watch for arriving packets from the 802.11~ layer.)  The client's run method is invoked 
- * by main via SwingUtilities.invokeAndWait() to ensure it's executed on the event-dispatching 
+ * called from the client's run() method.  (The run() method also starts up a thread to
+ * watch for arriving packets from the 802.11~ layer.)  The client's run method is invoked
+ * by main via SwingUtilities.invokeAndWait() to ensure it's executed on the event-dispatching
  * thread.
- * 
+ *
  * A complete Java implementation looks like:
  * <blockquote><pre>
  * WiFiClient
@@ -45,8 +45,8 @@ import javax.swing.SwingUtilities;
  * LinkLayer (802.11~ implementation)
  * RF
  * </pre></blockquote>
- * 
- * A complete C++ implementation is messier, due to the need for additional layers to 
+ *
+ * A complete C++ implementation is messier, due to the need for additional layers to
  * mediate between the Java and C++ code:
  * <blockquote><pre>
  * WiFiClient (Java)
@@ -56,9 +56,9 @@ import javax.swing.SwingUtilities;
  * RF (C++ JNI layer)
  * RF (Java implementation of RF layer)
  * </pre></blockquote>
- * 
+ *
  * See the project documentation for additional information on compiling an 802.11~ project.
- * 
+ *
  * @author Brad Richards
  * @version 1.2
  *
@@ -80,7 +80,7 @@ public class WiFiClient implements ActionListener, Runnable {
 
    protected short MACaddr;             // This station's address
    private GUIClientInterface theLinkLayer;// The link layer we're "driving"
-   
+
    protected static int NUM_CTRL_BUTTONS = 4;
    protected static int NUM_SEND_BUTTONS = 10;
 
@@ -169,12 +169,12 @@ public class WiFiClient implements ActionListener, Runnable {
 
       // Create all of the ctrlButtons and register this object as listener
       // for each.
-      ctrlButtons[COMMAND] = new JButton("Command"); 
-      ctrlButtons[CLEAR] = new JButton("Clear");       
+      ctrlButtons[COMMAND] = new JButton("Command");
+      ctrlButtons[CLEAR] = new JButton("Clear");
       if (paused)
-         ctrlButtons[PAUSE] = new JButton("Resume"); 
-      else 
-         ctrlButtons[PAUSE] = new JButton("Pause"); 
+         ctrlButtons[PAUSE] = new JButton("Resume");
+      else
+         ctrlButtons[PAUSE] = new JButton("Pause");
       ctrlButtons[SAVE] = new JButton("Save");
       for(int i=0; i<ctrlButtons.length; i++) {
          controls.add(ctrlButtons[i]);
@@ -190,7 +190,7 @@ public class WiFiClient implements ActionListener, Runnable {
 
 
 
-   /** 
+   /**
     * Handler for button-press events.  Users should never need to call
     * this directly.
     */
@@ -199,11 +199,11 @@ public class WiFiClient implements ActionListener, Runnable {
          if (e.getSource() == sendButtons[i]) {
             // If shift was held, it means we redo the button
             if ((e.getModifiers() & ActionEvent.SHIFT_MASK) > 0) {
-               String inputString = 
-                  JOptionPane.showInputDialog(null, 
+               String inputString =
+                  JOptionPane.showInputDialog(null,
                         "Please enter MAC address for this button:",
                         "Set Address",
-                        JOptionPane.QUESTION_MESSAGE);  
+                        JOptionPane.QUESTION_MESSAGE);
                Scanner s = new Scanner(inputString);
                if (s.hasNextShort()) {
                   sendAddrs[i] = s.nextShort();
@@ -234,11 +234,11 @@ public class WiFiClient implements ActionListener, Runnable {
       // and value.  (The value defaults to 0.)  Pass the pair of integers
       // to the 802.11~ layer and report the result to the output panel.
       if (e.getSource() == ctrlButtons[COMMAND]) {
-         String inputString = 
-            JOptionPane.showInputDialog(null, 
+         String inputString =
+            JOptionPane.showInputDialog(null,
                   "Enter command and value, separated by spaces",
                   "Enter Command",
-                  JOptionPane.QUESTION_MESSAGE);  
+                  JOptionPane.QUESTION_MESSAGE);
          Scanner s = new Scanner(inputString);
          int value = 0;
          if (s.hasNextInt()) {
@@ -253,7 +253,7 @@ public class WiFiClient implements ActionListener, Runnable {
       }
       // Clear deletes the text from the buffer and resets the display
       else if (e.getSource() == ctrlButtons[CLEAR]) { // CLEAR
-         outputText.delete(0, outputText.length());   
+         outputText.delete(0, outputText.length());
          display.setText("");
          textPane.getVerticalScrollBar().setValue(Integer.MAX_VALUE);
       }
@@ -281,21 +281,21 @@ public class WiFiClient implements ActionListener, Runnable {
    /**
     * Call this to append text to the scrolling output pane.  No newlines are added,
     * so be sure to include a "\n" where desired.  Text is collected in a StringBuffer
-    * (outputText) as well as the JTextArea (display).  This allows us to continue 
+    * (outputText) as well as the JTextArea (display).  This allows us to continue
     * buffering text even when the window output is paused.
-    * 
+    *
     * @param msg  Text to add to the scrolling pane
     */
    public synchronized void addText(String msg) {
-      
-      outputText.append(msg);   
+
+      outputText.append(msg);
       // Setting the scroll bar's position sometimes causes a mysterious exception
       // to be thrown.  If it happens, pause while the output collects in outputText.
       // When the user resumes, all of the outputText will be dumped into the display
       // pane again.
       try {
-         if (!paused) { 
-            display.append(msg); 
+         if (!paused) {
+            display.append(msg);
             //textPane.getVerticalScrollBar().setValue(Integer.MAX_VALUE);
          }
       } catch (RuntimeException e) {
@@ -303,7 +303,7 @@ public class WiFiClient implements ActionListener, Runnable {
          paused = true;
          ctrlButtons[PAUSE].setText("Resume");
       }
-   }   
+   }
 
    /**
     * Prompts user to select an output file, then writes all text from the
@@ -323,7 +323,7 @@ public class WiFiClient implements ActionListener, Runnable {
          } catch (IOException e) {
             outputText.append("Error writing to file!!");
          }
-      } 
+      }
    }
 
 
@@ -331,7 +331,7 @@ public class WiFiClient implements ActionListener, Runnable {
     * The run method should be executed by the event-dispatching thread.  it creates
     * the GUI and starts a thread to watch for packets arriving for this station.
     */
-   public void run() { 
+   public void run() {
       buildGUI();
       (new Thread(new StreamWatcher(this))).start();
    }
@@ -341,7 +341,7 @@ public class WiFiClient implements ActionListener, Runnable {
     * We need this inner class to wrap up the code that watches for arriving packets.
     * We can't run it in the event-dispatching thread, so this loop can't just go in
     * the run() method.
-    * 
+    *
     * @author Brad Richards
     */
    class StreamWatcher implements Runnable {
@@ -358,7 +358,7 @@ public class WiFiClient implements ActionListener, Runnable {
                Thread.sleep(20);
             } catch (InterruptedException e) {
                // Do nothing if awakened early
-            }   
+            }
             byte[] bytes = theLinkLayer.watchForIncomingData();
             if (bytes != null && bytes.length >= 2) {
                int tmp = ((int)bytes[0]) & 0xFF;
@@ -385,7 +385,7 @@ public class WiFiClient implements ActionListener, Runnable {
       short mac;
 
       // Take MAC on command-line if it's available, or create a random MAC
-      
+
       if (args.length > 0) {
          mac = (new Scanner(args[0]).nextShort());
          System.out.println("Using MAC address of "+mac+" as requested.");
@@ -396,33 +396,33 @@ public class WiFiClient implements ActionListener, Runnable {
       }
 
       // Use the CppGUIAdapter for a C++-based project, JavaGUIAdapter for Java-based project
-      
+
 //    GUIClientInterface linkLayer = new CppGUIAdapter();
       GUIClientInterface linkLayer = new JavaGUIAdapter();
       WiFiClient display = new WiFiClient(mac, linkLayer);
 
       // This mechanism causes the GUI to be created by the event-dispatching thread
-      
+
       try {
          SwingUtilities.invokeAndWait(display);
       } catch (Exception e1) {
          System.err.println("Yikes!  Something went wrong when invoking WiFiClient's run() method:");
          e1.printStackTrace();
       }
-      
+
       // Remind the user how to modify buttons
-      
+
       display.addText("Shift-click a button to change its MAC address.\n");
 
       // Run forever, watching for input from the link layer and adding it to the GUI's
       // text display window.
-      
+
       for(;;) {
          try {
             Thread.sleep(100);
          } catch (InterruptedException e) {
             // Do nothing if awakened early
-         }   
+         }
          byte[] bytes = linkLayer.pollForStreamOutput();
          if (bytes != null) {
             String output = new String(bytes, 0, bytes.length);
@@ -432,5 +432,3 @@ public class WiFiClient implements ActionListener, Runnable {
    }
 
 }
-
-
