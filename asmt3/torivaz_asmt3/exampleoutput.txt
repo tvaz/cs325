@@ -1,0 +1,15 @@
+Using specified MAC address: 100
+RF layer (v1.7) initialized at Mon Mar 07 14:04:26 PST 2016 (/10.150.2.3)
+Writer is alive and well
+Reader is alive and well
+Recieved [ 0 -56 0 0 1 83 83 28 60 66 ]
+Host 200 says time is 1457388272706
+Sent packet: 100 1457388273804  [ 0 100 0 0 1 83 83 28 64 -116 ]
+Sent packet: 100 1457388275365  [ 0 100 0 0 1 83 83 28 70 -91 ]
+Recieved [ 0 -56 0 0 1 83 83 28 89 4 ]
+Host 200 says time is 1457388280068
+Sent packet: 100 1457388277835  [ 0 100 0 0 1 83 83 28 80 75 ]
+Sent packet: 100 1457388278744  [ 0 100 0 0 1 83 83 28 83 -40 ]
+Recieved [ 0 -56 0 0 1 83 83 28 119 108 ]
+Host 200 says time is 1457388287852
+Sent packet: 100 1457388285702  [ 0 100 0 0 1 83 83 28 111 6 ]
