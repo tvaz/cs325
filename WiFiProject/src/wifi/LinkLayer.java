@@ -32,9 +32,10 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	public int send(short dest, byte[] data, int len) {
 		output.println("LinkLayer: Sending "+len+" bytes to "+dest);
-		theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0));
+		//-10 to remove header overhead
+		return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
 		//call recv for ack?
-		return len;
+		
 	}
 	
 	/**
