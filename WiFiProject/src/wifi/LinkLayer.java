@@ -5,7 +5,7 @@ import rf.RF;
 /**
  * Use this layer as a starting point for your project code.  See {@link Dot11Interface} for more
  * details on these routines.
- * @author richards
+ * @author Cody Kagawa & Tori Vaz(richards)
  */
 public class LinkLayer implements Dot11Interface {
 	private RF theRF;           // You'll need one of these eventually
@@ -50,11 +50,11 @@ public class LinkLayer implements Dot11Interface {
 		output.println("LinkLayer: Pretending to block on recv()");
 		while(!theRF.dataWaiting()){
 			try{
-				wait(1454);
+				wait(1000);
 			}
 			catch(InterruptedException e)
 			{
-				
+				return -1;
 			}
 		}
 		Packet temp = new Packet(theRF.receive());
