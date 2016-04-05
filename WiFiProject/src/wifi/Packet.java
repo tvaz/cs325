@@ -39,6 +39,7 @@ class Packet {
 	        packet[i+6] = src[i];
 	    }
 	    //checksum goes here
+	    System.out.println("" + packet[0] + '\t' +packet[1] + '\t'+packet[2] + '\t' + packet[3]+ '\t'+packet[4] + '\t' + packet[5]);
 	    return packet;
 	}
 

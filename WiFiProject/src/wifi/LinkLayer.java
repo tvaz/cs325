@@ -11,7 +11,11 @@ public class LinkLayer implements Dot11Interface {
 	private RF theRF;           // You'll need one of these eventually
 	private short ourMAC;       // Our MAC address
 	private PrintWriter output; // The output stream we'll write to
-	private static final short DATAC = 0x0;
+	private static final short DATAC = 0x00;
+	private static final short ACK = 0x01;
+	private static final short Beacon = 0x02;
+	private static final short CTS = 0x03;
+	private static final short RTS = 0x04;
 	
 	/**
 	 * Constructor takes a MAC address and the PrintWriter to which our output will
@@ -61,11 +65,14 @@ public class LinkLayer implements Dot11Interface {
 					t.setBuf(temp.getData());
 					t.setDestAddr(temp.getDestAddr());
 					t.setSourceAddr(temp.getSrcAddr());
-					
+				case ACK:;
+				case Beacon:;
+				case CTS:;
+				case RTS:;
 			}
 			//send ack?
 		}
-		//hopefully can remove recursion eventually
+		//will eventually replace recursion with loop
 		else
 		{
 			return recv(t);
