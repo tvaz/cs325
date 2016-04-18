@@ -30,6 +30,7 @@ public class LinkLayer implements Dot11Interface {
 		output.println("LinkLayer: Constructor ran.");
 	}
 	
+	
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
@@ -65,6 +66,7 @@ public class LinkLayer implements Dot11Interface {
 					t.setBuf(temp.getData());
 					t.setDestAddr(temp.getDestAddr());
 					t.setSourceAddr(temp.getSrcAddr());
+					return temp.getData().length;
 				case ACK:;
 				case Beacon:;
 				case CTS:;
@@ -94,5 +96,29 @@ public class LinkLayer implements Dot11Interface {
 	public int command(int cmd, int val) {
 		output.println("LinkLayer: Sending command "+cmd+" with value "+val);
 		return 0;
+	}
+	private class PacketParser implements Runnable{
+		private static final short WAIT_INTERVAL = 100;
+		PacketParser(){
+			
+		}
+		public void run()
+		{
+			boolean valid = true;
+			while(valid)
+			{
+				try{
+					wait(WAIT_INTERVAL);
+					if(theRF.dataWaiting())
+					{
+						recv();
+					}
+				}
+				catch(InterruptedException e)
+				{
+					
+				}
+			}
+		}
 	}
 }
