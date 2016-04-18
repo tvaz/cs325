@@ -1,7 +1,7 @@
 package wifi;
 import java.io.PrintWriter;
 import rf.RF;
-	
+
 /**
  * Use this layer as a starting point for your project code.  See {@link Dot11Interface} for more
  * details on these routines.
@@ -16,7 +16,7 @@ public class LinkLayer implements Dot11Interface {
 	private static final short Beacon = 0x02;
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
-	
+
 	/**
 	 * Constructor takes a MAC address and the PrintWriter to which our output will
 	 * be written.
@@ -25,24 +25,48 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	public LinkLayer(short ourMAC, PrintWriter output) {
 		this.ourMAC = ourMAC;
-		this.output = output;      
+		this.output = output;
 		theRF = new RF(null, null);
 		output.println("LinkLayer: Constructor ran.");
 	}
-	
-	
+
+
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
 	 */
 	public int send(short dest, byte[] data, int len) {
+
+		int backoff = theRF.aCWmin;
+
 		output.println("LinkLayer: Sending "+len+" bytes to "+dest);
 		//-10 to remove header overhead
-		return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
+		Boolean sending = true;
+		while(sending){
+			if(!theRF.inUse){
+				wait(theRF.SIFSTime);
+				if(!theRF.inUse){
+					sending = false;
+					return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
+				}
+			}
+			while(theRF.inUse){
+				wait(10);
+
+				double r = Math.random();
+
+				backoff=backoff^2;
+
+				if(backoff > theRF.aCWmax){
+					backoff = theRF.aCWmax;
+				}
+		}
+
+		//return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
 		//call recv for ack?
-		
+
 	}
-	
+
 	/**
 	 * Recv method blocks until data arrives, then writes it an address info into
 	 * the Transmission object.  See docs for full description.
@@ -62,7 +86,7 @@ public class LinkLayer implements Dot11Interface {
 		if(temp.getDestAddr() == ourMAC){
 			//check if wanted packet
 			switch(temp.getType()){
-				case DATAC: 
+				case DATAC:
 					t.setBuf(temp.getData());
 					t.setDestAddr(temp.getDestAddr());
 					t.setSourceAddr(temp.getSrcAddr());
@@ -81,7 +105,7 @@ public class LinkLayer implements Dot11Interface {
 		}
 		return 0;
 	}
-	
+
 	/**
 	 * Returns a current status code.  See docs for full description.
 	 */
@@ -89,7 +113,7 @@ public class LinkLayer implements Dot11Interface {
 		output.println("LinkLayer: Faking a status() return value of 0");
 		return 0;
 	}
-	
+
 	/**
 	 * Passes command info to your link layer.  See docs for full description.
 	 */
@@ -100,7 +124,7 @@ public class LinkLayer implements Dot11Interface {
 	private class PacketParser implements Runnable{
 		private static final short WAIT_INTERVAL = 100;
 		PacketParser(){
-			
+
 		}
 		public void run()
 		{
@@ -116,7 +140,7 @@ public class LinkLayer implements Dot11Interface {
 				}
 				catch(InterruptedException e)
 				{
-					
+
 				}
 			}
 		}
