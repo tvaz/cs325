@@ -41,6 +41,7 @@ public class LinkLayer implements Dot11Interface {
 
 		output.println("LinkLayer: Sending "+len+" bytes to "+dest);
 		//-10 to remove header overhead
+
 		Boolean sending = true;
 		while(sending){
 			if(!theRF.inUse){
@@ -65,6 +66,15 @@ public class LinkLayer implements Dot11Interface {
 		//return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
 		//call recv for ack?
 
+		int retrn = theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
+		boolean ak = false;
+		while(!ak)
+		{
+
+		}
+		//call recv for ack?
+		return retrn;
+
 	}
 
 	/**
@@ -75,7 +85,7 @@ public class LinkLayer implements Dot11Interface {
 		output.println("LinkLayer: Pretending to block on recv()");
 		while(!theRF.dataWaiting()){
 			try{
-				wait(1000);
+				wait(100);
 			}
 			catch(InterruptedException e)
 			{
