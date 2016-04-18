@@ -44,23 +44,33 @@ public class LinkLayer implements Dot11Interface {
 
 		Boolean sending = true;
 		while(sending){
-			if(!theRF.inUse){
-				wait(theRF.SIFSTime);
-				if(!theRF.inUse){
+			if(!theRF.inUse()){
+				try{
+					wait(theRF.aSIFSTime);
+				}
+				catch(InterruptedException e)
+				{
+					
+				}
+				if(!theRF.inUse()){
 					sending = false;
 					return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
 				}
 			}
-			while(theRF.inUse){
-				wait(10);
-
-				double r = Math.random();
-
+			while(theRF.inUse()){
+				try{
+					wait((int)(backoff*Math.random()));
+				}
+				catch(InterruptedException e)
+				{
+					
+				}
 				backoff=backoff^2;
 
 				if(backoff > theRF.aCWmax){
 					backoff = theRF.aCWmax;
 				}
+			}
 		}
 
 		//return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
