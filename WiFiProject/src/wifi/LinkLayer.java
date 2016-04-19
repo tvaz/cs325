@@ -141,28 +141,4 @@ public class LinkLayer implements Dot11Interface {
 		output.println("LinkLayer: Sending command "+cmd+" with value "+val);
 		return 0;
 	}
-	private class PacketParser implements Runnable{
-		private static final short WAIT_INTERVAL = 100;
-		PacketParser(){
-
-		}
-		public void run()
-		{
-			boolean valid = true;
-			while(valid)
-			{
-				try{
-					wait(WAIT_INTERVAL);
-					if(theRF.dataWaiting())
-					{
-						recv();
-					}
-				}
-				catch(InterruptedException e)
-				{
-
-				}
-			}
-		}
-	}
 }
