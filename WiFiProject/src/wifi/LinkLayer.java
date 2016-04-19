@@ -130,7 +130,11 @@ public class LinkLayer implements Dot11Interface {
 
 			}
 			if(!theRF.inUse()){
-				return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest))) -10;
+				int c = theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest))) -10;
+				//there should be some checks here and proper handling of next sequence number for dest
+				sequence.put(dest, (short)(sequence.get(dest)+1));
+				System.out.println(sequence.get(dest));
+				return c;
 			}
 		}
 
