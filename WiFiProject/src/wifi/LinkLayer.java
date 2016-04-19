@@ -53,7 +53,7 @@ public class LinkLayer implements Dot11Interface {
 		while(sending){
 			if(!theRF.inUse()){
 				try{
-					synchronized(this){wait(theRF.aSIFSTime);}
+					synchronized(this){wait(theRF.aSlotTime);}
 				}
 				catch(InterruptedException e)
 				{
@@ -87,7 +87,7 @@ public class LinkLayer implements Dot11Interface {
 		boolean ak = false;
 		while(!ak)
 		{
-
+			
 		}
 		//call recv for ack?
 		return retrn;
