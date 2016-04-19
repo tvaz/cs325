@@ -18,6 +18,7 @@ public class LinkLayer implements Dot11Interface {
 	private static final short Beacon = 0x02;
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
+	private short sequence;
 	private Rcver queue;
 	private Thread watcher;
 
@@ -33,11 +34,12 @@ public class LinkLayer implements Dot11Interface {
 		theRF = new RF(null, null);
 		output.println("LinkLayer: Constructor ran.");
 		queue = new Rcver();
+		sequence = 0;
 		watcher = (new Thread(queue));
 		watcher.start();
 	}
 
-
+	private int pSend(short dest, byte[] data, int len)
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
@@ -48,48 +50,47 @@ public class LinkLayer implements Dot11Interface {
 
 		output.println("LinkLayer: Sending "+len+" bytes to "+dest);
 		//-10 to remove header overhead
-
-		Boolean sending = true;
-		while(sending){
-			if(!theRF.inUse()){
-				try{
-					synchronized(this){wait(theRF.aSlotTime);}
-				}
-				catch(InterruptedException e)
-				{
-					
-				}
-				if(!theRF.inUse()){
-					sending = false;
-					return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
-				}
+		try{
+			synchronized(this){wait(theRF.aSlotTime);}
+		}
+		catch(InterruptedException e)
+		{
+			
+		}
+		if(!theRF.inUse()){
+			try{
+				synchronized(this){wait(theRF.aSlotTime);}
 			}
-			while(theRF.inUse()){
-				try{
-					wait((int)(backoff*Math.random()));
-				}
-				catch(InterruptedException e)
-				{
-					
-				}
-				backoff=backoff^2;
-
-				if(backoff > theRF.aCWmax){
-					backoff = theRF.aCWmax;
-				}
+			catch(InterruptedException e)
+			{
+				
+			}
+			if(!theRF.inUse()){
+				return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,sequence)) -10;
 			}
 		}
+		
+		while(theRF.inUse()){
+			try{
+				wait((int)(theRF.aSlotTime+(backoff*Math.random())));
+			}
+			catch(InterruptedException e)
+			{
+				
+			}
+			backoff=backoff^2;
+
+			if(backoff > theRF.aCWmax){
+				backoff = theRF.aCWmax;
+			}
+		}
+		
 
 		//return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
 		//call recv for ack?
 
 		int retrn = theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
-		boolean ak = false;
-		while(!ak)
-		{
-			
-		}
-		//call recv for ack?
+		//?
 		return retrn;
 
 	}
@@ -141,7 +142,11 @@ public class LinkLayer implements Dot11Interface {
 				
 			}
 		}
-		Packet temp = queue.buffer.remove(0);
+		Packet temp = queue.grabPack(0);
+		if(temp == null)
+		{
+			return 0;
+		}
 		switch(temp.getType()){
 			case DATAC:
 				t.setBuf(temp.getData());
@@ -183,6 +188,15 @@ public class LinkLayer implements Dot11Interface {
 		{
 			buffer = new ArrayList<Packet>();
 		}
+		public Packet grabPack(int in)
+		{
+			if(in>=buffer.size()||in<0)
+			{
+				return null;
+			}
+			return buffer.get(in);
+		}
+		
 		public void run()
 		{
 			while(true)
