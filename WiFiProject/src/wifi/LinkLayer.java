@@ -53,7 +53,7 @@ public class LinkLayer implements Dot11Interface {
 		while(sending){
 			if(!theRF.inUse()){
 				try{
-					wait(theRF.aSIFSTime);
+					synchronized(this){wait(theRF.aSIFSTime);}
 				}
 				catch(InterruptedException e)
 				{
@@ -134,7 +134,7 @@ public class LinkLayer implements Dot11Interface {
 		while(queue.buffer.size()<1)
 		{
 			try{
-				synchronized(watcher){wait(100);};
+				synchronized(this){wait(100);};
 			}
 			catch(InterruptedException e)
 			{
@@ -189,13 +189,14 @@ public class LinkLayer implements Dot11Interface {
 			{
 				while(!theRF.dataWaiting()){
 					try{
-						synchronized(buffer){wait(FRESHRATE);}
+						synchronized(this){wait(FRESHRATE);}
 					}
 					catch(InterruptedException e)
 					{
 						;
 					}
 				}
+				//fix this when switch to array
 				Packet temp = new Packet(theRF.receive());
 				if(temp.getDestAddr() == ourMAC){
 					//check if wanted packet
