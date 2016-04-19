@@ -18,9 +18,10 @@ public class LinkLayer implements Dot11Interface {
 	private static final short Beacon = 0x02;
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
-	private short sequence;
-	private Rcver queue;
-	private Thread watcher;
+	private ArrayList<PWrapper> sWindow; //sliding window, --to be converted to array
+	private short sequence; //current sequence number
+	private Rcver queue; 
+	private Thread watcher; //thread around queue, watch for incoming data
 
 	/**
 	 * Constructor takes a MAC address and the PrintWriter to which our output will
@@ -34,12 +35,63 @@ public class LinkLayer implements Dot11Interface {
 		theRF = new RF(null, null);
 		output.println("LinkLayer: Constructor ran.");
 		queue = new Rcver();
+		sWindow = new ArrayList<PWrapper>();
 		sequence = 0;
 		watcher = (new Thread(queue));
 		watcher.start();
 	}
-
-	private int pSend(short dest, byte[] data, int len)
+	//private send function for retransmission and acks
+	private void pSend(short dest, byte[] data, int len,boolean re, int retry, short type, short seqNum){
+		switch(type){
+		//data retransmissions
+		case DATAC:		
+			int backoff = theRF.aCWmin;
+			try{
+				synchronized(this){wait(theRF.aSlotTime);}
+			}
+			catch(InterruptedException e)
+			{
+				
+			}
+			if(!theRF.inUse()){
+				try{
+					synchronized(this){wait(theRF.aSlotTime);}
+				}
+				catch(InterruptedException e)
+				{
+					
+				}
+				if(!theRF.inUse()){
+					theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqNum));
+				}
+			}
+			
+			while(theRF.inUse()){
+				try{
+					wait((int)(theRF.aSlotTime+(backoff*Math.random())));
+				}
+				catch(InterruptedException e)
+				{
+					
+				}
+				backoff=backoff^2;
+	
+				if(backoff > theRF.aCWmax){
+					backoff = theRF.aCWmax;
+				}
+		}
+		case ACK: 
+			try{
+				synchronized(this){wait(theRF.aSIFSTime);}
+			}
+			catch(InterruptedException e)
+			{
+				
+			}
+			theRF.transmit(Packet.generatePacket(data,dest,ourMAC,ACK,re,seqNum));
+		}
+		//more for other stuff possibly
+	}
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
@@ -90,6 +142,7 @@ public class LinkLayer implements Dot11Interface {
 		//call recv for ack?
 
 		int retrn = theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
+		
 		//?
 		return retrn;
 
@@ -153,10 +206,7 @@ public class LinkLayer implements Dot11Interface {
 				t.setDestAddr(temp.getDestAddr());
 				t.setSourceAddr(temp.getSrcAddr());
 				return temp.getData().length;
-			case ACK:;
-			case Beacon:;
-			case CTS:;
-			case RTS:;
+				//might remove cases entirely, seems this may be incorrect place to handle
 		}
 		return 0;
 	}
@@ -188,6 +238,7 @@ public class LinkLayer implements Dot11Interface {
 		{
 			buffer = new ArrayList<Packet>();
 		}
+		//might include code specifically for grabbing/compressing acks
 		public Packet grabPack(int in)
 		{
 			if(in>=buffer.size()||in<0)
@@ -225,6 +276,17 @@ public class LinkLayer implements Dot11Interface {
 					buffer.add(temp);
 				}
 			}
+		}
+	}
+	private class PWrapper{
+		Packet pack;
+		short dest;
+		int seqNum;
+		PWrapper(int s, Packet p, short d)
+		{
+			dest = d;
+			pack = p;
+			seqNum = s;
 		}
 	}
 }
