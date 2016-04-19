@@ -1,5 +1,7 @@
 package wifi;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+
 import rf.RF;
 
 /**
@@ -16,6 +18,8 @@ public class LinkLayer implements Dot11Interface {
 	private static final short Beacon = 0x02;
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
+	private Rcver queue;
+	private Thread watcher;
 
 	/**
 	 * Constructor takes a MAC address and the PrintWriter to which our output will
@@ -28,6 +32,9 @@ public class LinkLayer implements Dot11Interface {
 		this.output = output;
 		theRF = new RF(null, null);
 		output.println("LinkLayer: Constructor ran.");
+		queue = new Rcver();
+		watcher = (new Thread(queue));
+		watcher.start();
 	}
 
 
@@ -93,7 +100,7 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	public int recv(Transmission t) {
 		output.println("LinkLayer: Pretending to block on recv()");
-		while(!theRF.dataWaiting()){
+		/*while(!theRF.dataWaiting()){
 			try{
 				wait(100);
 			}
@@ -123,6 +130,29 @@ public class LinkLayer implements Dot11Interface {
 		{
 			return recv(t);
 		}
+		return 0;*/
+		while(queue.buffer.size()<1)
+		{
+			try{
+				synchronized(watcher){wait(100);};
+			}
+			catch(InterruptedException e)
+			{
+				
+			}
+		}
+		Packet temp = queue.buffer.remove(0);
+		switch(temp.getType()){
+			case DATAC:
+				t.setBuf(temp.getData());
+				t.setDestAddr(temp.getDestAddr());
+				t.setSourceAddr(temp.getSrcAddr());
+				return temp.getData().length;
+			case ACK:;
+			case Beacon:;
+			case CTS:;
+			case RTS:;
+		}
 		return 0;
 	}
 
@@ -140,5 +170,46 @@ public class LinkLayer implements Dot11Interface {
 	public int command(int cmd, int val) {
 		output.println("LinkLayer: Sending command "+cmd+" with value "+val);
 		return 0;
+	}
+	/**
+	 * back end recv stuff.
+	 */
+	private class Rcver implements Runnable
+	{
+		ArrayList<Packet> buffer; //to be changed when actually using limited buffer
+		private static final short BSIZE = 20; //packet buffer
+		private static final short FRESHRATE = 100; //refresh interval
+		Rcver()
+		{
+			buffer = new ArrayList<Packet>();
+		}
+		public void run()
+		{
+			while(true)
+			{
+				while(!theRF.dataWaiting()){
+					try{
+						synchronized(buffer){wait(FRESHRATE);}
+					}
+					catch(InterruptedException e)
+					{
+						;
+					}
+				}
+				Packet temp = new Packet(theRF.receive());
+				if(temp.getDestAddr() == ourMAC){
+					//check if wanted packet
+					/*switch(temp.getType()){
+						case DATAC: buffer.add(temp);
+						case ACK:;
+						case Beacon:;
+						case CTS:;
+						case RTS:;
+					}*/
+					//send ack?
+					buffer.add(temp);
+				}
+			}
+		}
 	}
 }
