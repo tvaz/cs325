@@ -1,6 +1,7 @@
 package wifi;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import rf.RF;
 
@@ -19,7 +20,7 @@ public class LinkLayer implements Dot11Interface {
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
 	private ArrayList<PWrapper> sWindow; //sliding window, --to be converted to array
-	private short sequence; //current sequence number
+	private HashMap<Short,Short> sequence; //current sequence number for each destination
 	private Rcver queue; 
 	private Thread watcher; //thread around queue, watch for incoming data
 
@@ -36,7 +37,7 @@ public class LinkLayer implements Dot11Interface {
 		output.println("LinkLayer: Constructor ran.");
 		queue = new Rcver();
 		sWindow = new ArrayList<PWrapper>();
-		sequence = 0;
+		sequence = new HashMap<Short,Short>();
 		watcher = (new Thread(queue));
 		watcher.start();
 	}
@@ -92,6 +93,17 @@ public class LinkLayer implements Dot11Interface {
 		}
 		//more for other stuff possibly
 	}
+	//returns next sequence number for the given destination address
+	private short seqCheck(short addr)
+	{
+		if(sequence.get(addr)==null){
+			sequence.put(addr, (short)0);
+			return 0;
+		}
+		else{
+			return sequence.get(addr);
+		}
+	}
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
@@ -118,7 +130,7 @@ public class LinkLayer implements Dot11Interface {
 
 			}
 			if(!theRF.inUse()){
-				return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,sequence)) -10;
+				return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest))) -10;
 			}
 		}
 
@@ -245,7 +257,7 @@ public class LinkLayer implements Dot11Interface {
 			{
 				return null;
 			}
-			return buffer.get(in);
+			return buffer.remove(in);
 		}
 
 		public void run()
@@ -266,7 +278,24 @@ public class LinkLayer implements Dot11Interface {
 				if(temp.getDestAddr() == ourMAC){
 					//check if wanted packet
 					switch(temp.getType()){
-						case DATAC: buffer.add(temp);
+						case DATAC:
+							boolean old = false;
+							for(Packet p:buffer)
+							{
+								if(p.getSqnc() <= temp.getSqnc()&&p.getSrcAddr() == temp.getSrcAddr())
+								{
+									old = true;
+								}
+							}
+							if(old)
+							{
+								break;
+							}
+							else
+							{
+								buffer.add(temp);
+							}
+							
 						//code for sequence number checking
 						case ACK: //code for updating sliding window;
 						case Beacon:;
