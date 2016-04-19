@@ -1,0 +1,22 @@
+Sending text message to MAC 798: "From Macbook"
+Tx starting from host 798 at local time 1461045573858
+    Received packet at 1461045574678
+Tx starting from host 798 at local time 1461045576931
+Tx starting from host 798 at local time 1461045580003
+    Received packet at 1461045580828
+Tx starting from host 798 at local time 1461045582664
+    Received packet at 1461045583688
+Tx from host 798 involved in collision at local time 1461045587581 (3)
+Collision ended at local time 1461045588201
+Sending text message to MAC 798: "From Macbook"
+Tx from host 798 involved in collision at local time 1461045729707 (6)
+Collision ended at local time 1461045730030
+Tx starting from host 798 at local time 1461045731549
+Sending text message to MAC 798: "From Macbook"
+    Received packet at 1461045732376
+Tx starting from host 798 at local time 1461045735439
+    Received packet at 1461045736264
+Tx starting from host 798 at local time 1461045738306
+Tx starting from host 798 at local time 1461045745270
+    Received packet at 1461045746293
+
