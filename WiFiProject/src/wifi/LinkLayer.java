@@ -107,7 +107,7 @@ public class LinkLayer implements Dot11Interface {
 		}
 		catch(InterruptedException e)
 		{
-			
+
 		}
 		if(!theRF.inUse()){
 			try{
@@ -115,20 +115,20 @@ public class LinkLayer implements Dot11Interface {
 			}
 			catch(InterruptedException e)
 			{
-				
+
 			}
 			if(!theRF.inUse()){
 				return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,sequence)) -10;
 			}
 		}
-		
+
 		while(theRF.inUse()){
 			try{
 				wait((int)(theRF.aSlotTime+(backoff*Math.random())));
 			}
 			catch(InterruptedException e)
 			{
-				
+
 			}
 			backoff=backoff^2;
 
@@ -136,7 +136,7 @@ public class LinkLayer implements Dot11Interface {
 				backoff = theRF.aCWmax;
 			}
 		}
-		
+
 
 		//return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
 		//call recv for ack?
@@ -192,7 +192,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 			catch(InterruptedException e)
 			{
-				
+
 			}
 		}
 		Packet temp = queue.grabPack(0);
@@ -247,7 +247,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 			return buffer.get(in);
 		}
-		
+
 		public void run()
 		{
 			while(true)
