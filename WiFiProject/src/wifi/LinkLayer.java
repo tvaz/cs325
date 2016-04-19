@@ -265,15 +265,14 @@ public class LinkLayer implements Dot11Interface {
 				Packet temp = new Packet(theRF.receive());
 				if(temp.getDestAddr() == ourMAC){
 					//check if wanted packet
-					/*switch(temp.getType()){
+					switch(temp.getType()){
 						case DATAC: buffer.add(temp);
-						case ACK:;
+						//code for sequence number checking
+						case ACK: //code for updating sliding window;
 						case Beacon:;
 						case CTS:;
 						case RTS:;
-					}*/
-					//send ack?
-					buffer.add(temp);
+					}
 				}
 			}
 		}
