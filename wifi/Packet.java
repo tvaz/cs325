@@ -15,7 +15,6 @@ class Packet {
 	* @arg type : 3 bits at front to show type of packet
 	* @arg retry : retry bit
 	* @arg seq: sequence number
-	* @return : the finished packet
 	**/
 	public static byte[] generatePacket(byte[] src, short dest, short home, short type, boolean retry, short seq)
 	{
@@ -34,8 +33,8 @@ class Packet {
 		packet[1] = (byte)(seq & 0xff);
 		packet[2] = (byte) (dest >> 8);
 		packet[3] = (byte) dest;
-	  packet[4] = (byte) (home >> 8);
-	  packet[5] = (byte) home;
+	    packet[4] = (byte) (home >> 8);
+	    packet[5] = (byte) home;
 	    for(int i=0;i<src.length;i++){
 	        packet[i+6] = src[i];
 	    }

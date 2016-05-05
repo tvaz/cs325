@@ -21,7 +21,7 @@ public class LinkLayer implements Dot11Interface {
 	private static final short RTS = 0x04;
 	private ArrayList<PWrapper> sWindow; //sliding window, --to be converted to array
 	private HashMap<Short,Short> sequence; //current sequence number for each destination
-	private Rcver queue; 
+	private Rcver queue;
 	private Thread watcher; //thread around queue, watch for incoming data
 
 	/**
@@ -42,17 +42,18 @@ public class LinkLayer implements Dot11Interface {
 		watcher.start();
 	}
 	//private send function for retransmission and acks
+	/*
 	private void pSend(short dest, byte[] data, int len,boolean re, int retry, short type, short seqNum){
 		switch(type){
 		//data retransmissions
-		case DATAC:		
+		case DATAC:
 			int backoff = theRF.aCWmin;
 			try{
 				synchronized(this){wait(theRF.aSlotTime);}
 			}
 			catch(InterruptedException e)
 			{
-				
+
 			}
 			if(!theRF.inUse()){
 				try{
@@ -60,39 +61,42 @@ public class LinkLayer implements Dot11Interface {
 				}
 				catch(InterruptedException e)
 				{
-					
+
 				}
 				if(!theRF.inUse()){
 					theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqNum));
 				}
 			}
-			
+
 			while(theRF.inUse()){
 				try{
 					wait((int)(theRF.aSlotTime+(backoff*Math.random())));
 				}
 				catch(InterruptedException e)
 				{
-					
+
 				}
 				backoff=backoff^2;
-	
+
 				if(backoff > theRF.aCWmax){
 					backoff = theRF.aCWmax;
 				}
 		}
-		case ACK: 
+		case ACK:
 			try{
 				synchronized(this){wait(theRF.aSIFSTime);}
 			}
 			catch(InterruptedException e)
 			{
-				
+
 			}
 			theRF.transmit(Packet.generatePacket(data,dest,ourMAC,ACK,re,seqNum));
 		}
 		//more for other stuff possibly
 	}
+	*/
+
+
 	//returns next sequence number for the given destination address
 	private short seqCheck(short addr)
 	{
@@ -104,6 +108,25 @@ public class LinkLayer implements Dot11Interface {
 			return sequence.get(addr);
 		}
 	}
+
+	private class FSM implements Runnable{
+
+		enum State{
+			IDLE,
+		}
+
+		State currentState;
+
+		public FSM(){
+			currentState = State.StateA;
+		}
+
+		public void run(){
+			//Run stuff
+		}
+
+	}
+
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
@@ -158,12 +181,12 @@ public class LinkLayer implements Dot11Interface {
 		//call recv for ack?
 
 		int retrn = theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
-		
+
 		//?
 		return retrn;
 
 	}
-
+``
 	/**
 	 * Recv method blocks until data arrives, then writes it an address info into
 	 * the Transmission object.  See docs for full description.
@@ -299,7 +322,7 @@ public class LinkLayer implements Dot11Interface {
 							{
 								buffer.add(temp);
 							}
-							
+
 						//code for sequence number checking
 						case ACK: //code for updating sliding window;
 						case Beacon:;
