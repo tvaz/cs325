@@ -20,13 +20,12 @@ public class LinkLayer implements Dot11Interface {
 	private static final short Beacon = 0x02;
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
-
 	private Queue<byte[]> dQueue; //send data queue
 	private HashMap<Short,Short[]> sequence; //current sequence number for each destination
-	private Rcver queue;
-
+	enum State{IDLE,}
+	private Thread fState;
 	private Thread watcher; //thread around queue, watch for incoming data
-
+	private Queue<byte[]> rQueue; //receive data queue
 	/**
 	 * Constructor takes a MAC address and the PrintWriter to which our output will
 	 * be written.
@@ -38,11 +37,15 @@ public class LinkLayer implements Dot11Interface {
 		this.output = output;
 		theRF = new RF(null, null);
 		output.println("LinkLayer: Constructor ran.");
-		queue = new Rcver();
-		dQueue = (Queue) new ArrayList<byte[]>();
+		dQueue = (Queue<byte[]>) new ArrayList<byte[]>();
+		rQueue = (Queue<byte[]>) new ArrayList<byte[]>();
 		sequence = new HashMap<Short,Short[]>();
-		watcher = (new Thread(queue));
+		//create background threads
+		fState = new Thread(new FSM());
+		watcher = new Thread(new Rcver());
+		//start background threads
 		watcher.start();
+		fState.start();
 	}
 
 	//private send function for retransmission and acks
@@ -102,7 +105,7 @@ public class LinkLayer implements Dot11Interface {
 
 
 
-	//returns next sequence number for the given destination address
+	//returns next sequence number for the given destination address -- maybe unnecessary
 	private short seqCheck(short addr)
 	{
 		if(sequence.get(addr)==null){
@@ -114,23 +117,6 @@ public class LinkLayer implements Dot11Interface {
 		}
 	}
 
-	private class FSM implements Runnable{
-
-		enum State{
-			IDLE,
-		}
-
-		State currentState;
-
-		public FSM(){
-			currentState = State.StateA;
-		}
-
-		public void run(){
-			//Run stuff
-		}
-
-	}
 
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
@@ -142,6 +128,7 @@ public class LinkLayer implements Dot11Interface {
 		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
 		//notify thread if currently idle
 		return data.length;
+		//old code
 		/*int backoff = theRF.aCWmin;
 
 		output.println("LinkLayer: Sending "+len+" bytes to "+dest);
@@ -195,7 +182,6 @@ public class LinkLayer implements Dot11Interface {
 		return retrn;*/
 
 	}
-``
 	/**
 	 * Recv method blocks until data arrives, then writes it an address info into
 	 * the Transmission object.  See docs for full description.
@@ -233,30 +219,21 @@ public class LinkLayer implements Dot11Interface {
 			return recv(t);
 		}
 		return 0;*/
-		while(queue.buffer.size()<1)
+		while(rQueue.isEmpty())
 		{
 			try{
-				synchronized(this){wait(100);};
+				synchronized(this){wait(100);}
 			}
 			catch(InterruptedException e)
 			{
-
+				
 			}
 		}
-		Packet temp = queue.grabPack(0);
-		if(temp == null)
-		{
-			return 0;
-		}
-		switch(temp.getType()){
-			case DATAC:
-				t.setBuf(temp.getData());
-				t.setDestAddr(temp.getDestAddr());
-				t.setSourceAddr(temp.getSrcAddr());
-				return temp.getData().length;
-				//might remove cases entirely, seems this may be incorrect place to handle
-		}
-		return 0;
+		Packet temp = new Packet(rQueue.poll());
+		t.setBuf(temp.getData());
+		t.setDestAddr(temp.getDestAddr());
+		t.setSourceAddr(temp.getSrcAddr());
+		return temp.getData().length;
 	}
 
 	/**
@@ -274,28 +251,31 @@ public class LinkLayer implements Dot11Interface {
 		output.println("LinkLayer: Sending command "+cmd+" with value "+val);
 		return 0;
 	}
+
+	class FSM implements Runnable{
+
+
+		State currentState;
+
+		public FSM(){
+			currentState = State.IDLE;
+		}
+		public void run(){
+			//Run stuff
+		}
+
+	}
 	/**
 	 * back end recv stuff.
 	 */
-	private class Rcver implements Runnable
+	class Rcver implements Runnable
 	{
-		ArrayList<Packet> buffer; //to be changed when actually using limited buffer
-		private static final short BSIZE = 20; //packet buffer
 		private static final short FRESHRATE = 100; //refresh interval
 		Rcver()
 		{
-			buffer = new ArrayList<Packet>();
 		}
 		//might include code specifically for grabbing/compressing acks
-		public Packet grabPack(int in)
-		{
-			if(in>=buffer.size()||in<0)
-			{
-				return null;
-			}
-			return buffer.remove(in);
-		}
-
+		
 		public void run()
 		{
 			while(true)
@@ -315,21 +295,9 @@ public class LinkLayer implements Dot11Interface {
 					//check if wanted packet
 					switch(temp.getType()){
 						case DATAC:
-							boolean old = false;
-							for(Packet p:buffer)
+							
 							{
-								if(p.getSqnc() <= temp.getSqnc()&&p.getSrcAddr() == temp.getSrcAddr())
-								{
-									old = true;
-								}
-							}
-							if(old)
-							{
-								break;
-							}
-							else
-							{
-								buffer.add(temp);
+								rQueue.offer(temp.pack);
 							}
 
 						//code for sequence number checking
