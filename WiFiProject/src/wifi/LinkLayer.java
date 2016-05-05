@@ -20,15 +20,11 @@ public class LinkLayer implements Dot11Interface {
 	private static final short Beacon = 0x02;
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
-<<<<<<< HEAD
-	private ArrayList<PWrapper> sWindow; //sliding window, --to be converted to array
-	private HashMap<Short,Short> sequence; //current sequence number for each destination
-	private Rcver queue;
-=======
+
 	private Queue<byte[]> dQueue; //send data queue
 	private HashMap<Short,Short[]> sequence; //current sequence number for each destination
 	private Rcver queue;
->>>>>>> 3688e56ebe8ab670a6508e95b74a5b15f6122d57
+
 	private Thread watcher; //thread around queue, watch for incoming data
 
 	/**
