@@ -2,6 +2,7 @@ package wifi;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Queue;
 
 import rf.RF;
 
@@ -19,9 +20,15 @@ public class LinkLayer implements Dot11Interface {
 	private static final short Beacon = 0x02;
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
+<<<<<<< HEAD
 	private ArrayList<PWrapper> sWindow; //sliding window, --to be converted to array
 	private HashMap<Short,Short> sequence; //current sequence number for each destination
 	private Rcver queue;
+=======
+	private Queue<byte[]> dQueue; //send data queue
+	private HashMap<Short,Short[]> sequence; //current sequence number for each destination
+	private Rcver queue;
+>>>>>>> 3688e56ebe8ab670a6508e95b74a5b15f6122d57
 	private Thread watcher; //thread around queue, watch for incoming data
 
 	/**
@@ -36,11 +43,12 @@ public class LinkLayer implements Dot11Interface {
 		theRF = new RF(null, null);
 		output.println("LinkLayer: Constructor ran.");
 		queue = new Rcver();
-		sWindow = new ArrayList<PWrapper>();
-		sequence = new HashMap<Short,Short>();
+		dQueue = (Queue) new ArrayList<byte[]>();
+		sequence = new HashMap<Short,Short[]>();
 		watcher = (new Thread(queue));
 		watcher.start();
 	}
+
 	//private send function for retransmission and acks
 	/*
 	private void pSend(short dest, byte[] data, int len,boolean re, int retry, short type, short seqNum){
@@ -97,15 +105,16 @@ public class LinkLayer implements Dot11Interface {
 	*/
 
 
+
 	//returns next sequence number for the given destination address
 	private short seqCheck(short addr)
 	{
 		if(sequence.get(addr)==null){
-			sequence.put(addr, (short)0);
+			sequence.put(addr, new Short[]{0,0});
 			return 0;
 		}
 		else{
-			return sequence.get(addr);
+			return sequence.get(addr)[1];
 		}
 	}
 
@@ -130,10 +139,14 @@ public class LinkLayer implements Dot11Interface {
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
+	 *
 	 */
+	//actually prepares data for send and transfers reliability responsibility
 	public int send(short dest, byte[] data, int len) {
-
-		int backoff = theRF.aCWmin;
+		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
+		//notify thread if currently idle
+		return data.length;
+		/*int backoff = theRF.aCWmin;
 
 		output.println("LinkLayer: Sending "+len+" bytes to "+dest);
 		//-10 to remove header overhead
@@ -146,7 +159,7 @@ public class LinkLayer implements Dot11Interface {
 		}
 		if(!theRF.inUse()){
 			try{
-				synchronized(this){wait(theRF.aSlotTime);}
+				synchronized(this){Thread.sleep(theRF.aSIFSTime);}
 			}
 			catch(InterruptedException e)
 			{
@@ -155,8 +168,8 @@ public class LinkLayer implements Dot11Interface {
 			if(!theRF.inUse()){
 				int c = theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest))) -10;
 				//there should be some checks here and proper handling of next sequence number for dest
-				sequence.put(dest, (short)(sequence.get(dest)+1));
-				System.out.println(sequence.get(dest));
+
+				System.out.println(sequence.get(dest)[1]);
 				return c;
 			}
 		}
@@ -183,7 +196,7 @@ public class LinkLayer implements Dot11Interface {
 		int retrn = theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
 
 		//?
-		return retrn;
+		return retrn;*/
 
 	}
 ``
@@ -331,17 +344,6 @@ public class LinkLayer implements Dot11Interface {
 					}
 				}
 			}
-		}
-	}
-	private class PWrapper{
-		Packet pack;
-		short dest;
-		int seqNum;
-		PWrapper(int s, Packet p, short d)
-		{
-			dest = d;
-			pack = p;
-			seqNum = s;
 		}
 	}
 }
