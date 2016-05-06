@@ -22,10 +22,17 @@ public class LinkLayer implements Dot11Interface {
 	private static final short RTS = 0x04;
 	private Queue<byte[]> dQueue; //send data queue
 	private HashMap<Short,Short[]> sequence; //current sequence number for each destination
+
 	enum State{IDLE,TRYSEND,TRYUPDATE}
 	private Thread fState;
 	private Thread watcher; //thread around queue, watch for incoming data
 	private Queue<byte[]> rQueue; //receive data queue
+
+	private int debug = 0;
+	private int slotMode = 0;
+	private int beaconInterval = -1;
+
+
 	/**
 	 * Constructor takes a MAC address and the PrintWriter to which our output will
 	 * be written.
@@ -226,7 +233,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 			catch(InterruptedException e)
 			{
-				
+
 			}
 		}
 		Packet temp = new Packet(rQueue.poll());
@@ -251,7 +258,46 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	public int command(int cmd, int val) {
 		output.println("LinkLayer: Sending command "+cmd+" with value "+val);
-		return 0;
+		//TODO: Implement command codes
+		/*
+		 * Command 0: Options and settings
+		 * Should summarize all command options and report their current settings. The accompanying value parameter is ignored.
+		 *
+		 * Command 1: Debug level.
+		 * The meaning of non-zero values can be implementation dependent, but passing a value of 0 should disable all debugging output.
+		 *
+		 * Command 2: Slot selection.
+		 * If the accompanying value parameter is 0 the link layer should select slots randomly. Any other value should cause the link layer to always select maxCW.
+		 *
+		 * Command 3: Beacon interval.
+		 * The accompanying value specifies the desired number of seconds between the start of beacon transmissions. A value of -1 should disable the sending of beacon frames.
+		 */
+		switch(cmd){
+		case 0:
+			output.println("====Command Settings====");
+			output.println("##Cmd 0: Display command options and current settings.");
+			output.println("Cmd 1: Set debug level. 0 for no debug output.");
+			output.println("Current debug level: "+debug);
+			output.println("##Cmd 2: Set slot selection mode. 0 for random, anything else to use MaxCW.");
+			output.println("Current mode: "+slotMode);
+			output.println("##Cmd 3: Set beacon interval, in seconds. -1 to disable beacons.");
+			output.println("Current interval: "+beaconInterval);
+			output.println("========================");
+			return 0;
+		case 1:
+			//Set debug level
+			return 0;
+		case 2:
+			//If 0, switch to Random slot selection mode
+			//Any other value, switch to always select maxCW
+			return 0;
+		case 3:
+			//-1 Disable beacon frames
+			//Otherwise, val will specify # of seconds
+			//between start of beacons
+			return 0;
+		}
+		return -1;
 	}
 
 	class FSM implements Runnable{
@@ -276,7 +322,7 @@ public class LinkLayer implements Dot11Interface {
 					if(!dQueue.isEmpty()||!rQueue.isEmpty())
 					{
 						currentState = State.TRYSEND;
-						
+
 					}
 					else{
 						try{Thread.sleep(100);}
@@ -292,7 +338,7 @@ public class LinkLayer implements Dot11Interface {
 				}
 			}
 		}
-		//trysend helper 
+		//trysend helper
 		void sCase(){
 			if(dQueue.isEmpty() && rQueue.isEmpty()){//needs additional check if frame buffer empty
 				currentState= State.IDLE;
@@ -306,7 +352,7 @@ public class LinkLayer implements Dot11Interface {
 				while(theRF.transmit(target)<=0);//need to change to actual check for correct number of bytes
 				sWindow.add(target);
 				System.out.println("transmitted");
-				
+
 			}
 			//include code to check if need to retransmit
 			if(false){//need check if frame buffer is full
@@ -329,7 +375,7 @@ public class LinkLayer implements Dot11Interface {
 		{
 		}
 		//might include code specifically for grabbing/compressing acks
-		
+
 		public void run()
 		{
 			while(true)
@@ -349,7 +395,7 @@ public class LinkLayer implements Dot11Interface {
 					//check if wanted packet
 					switch(temp.getType()){
 						case DATAC:
-							
+
 							{
 								rQueue.offer(temp.pack);
 							}
