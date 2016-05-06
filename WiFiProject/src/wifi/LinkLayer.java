@@ -218,20 +218,45 @@ public class LinkLayer implements Dot11Interface {
 		 */
 		switch(cmd){
 		case 0:
-			dPrint("====Command Settings====");
-			dPrint("##Cmd 0: Display command options and current settings.");
-			dPrint("Cmd 1: Set debug level. 0 for no debug output.");
-			dPrint("Current debug level: "+debug);
-			dPrint("##Cmd 2: Set slot selection mode. 0 for random, anything else to use MaxCW.");
-			dPrint("Current mode: "+slotMode);
-			dPrint("##Cmd 3: Set beacon interval, in seconds. -1 to disable beacons.");
-			dPrint("Current interval: "+beaconInterval);
-			dPrint("========================");
-			
+			//Display all options
+			output.println("====Command Settings====");
+			output.println("##Cmd 0: Display command options and current settings.");
+			output.println("Cmd 1: Set debug level. 0 for no debug output, 1 for full.");
+			if(debug == 0){
+				output.println("Current debug level: 0 (disabled)");
+			}
+			if(debug == 1){
+				output.println("Current debug level: 1 (enabled)");
+			}
+			output.println("##Cmd 2: Set slot selection mode. 0 for random, anything else to use MaxCW.");
+			if(slotMode == 0){
+				output.println("Current mode: 0 (random).");
+			} else{
+			output.println("Current mode: using maxCW.");
+			}
+			output.println("##Cmd 3: Set beacon interval, in seconds. -1 to disable beacons.");
+			if(beaconInterval == -1){
+				output.println("Current interval: -1 (disabled).");
+			} else{
+			output.println("Current interval: "+beaconInterval);
+			}
+			output.println("========================");
 			return 0;
 		case 1:
 			//Set debug level
-			return 0;
+			switch(val){
+			case 0:
+				debug = 0;
+				output.println("Debug output disabled.");
+				return 0;
+			case 1:
+				debug = 1;
+				output.println("Debug output enabled.");
+				return 0;
+			default:
+				output.println("Invalid; Try 0 or 1.");
+				return -1;
+			}
 		case 2:
 			//If 0, switch to Random slot selection mode
 			//Any other value, switch to always select maxCW
