@@ -43,7 +43,7 @@ public class LinkLayer implements Dot11Interface {
 		this.ourMAC = ourMAC;
 		this.output = output;
 		theRF = new RF(output, null);
-		output.println("LinkLayer: Constructor ran.");
+		dPrint("LinkLayer: Constructor ran.");
 		dQueue = (Queue<byte[]>) new LinkedList<byte[]>();
 		rQueue = (Queue<byte[]>) new LinkedList<byte[]>();
 		sequence = new HashMap<Short,Short[]>();
@@ -54,64 +54,6 @@ public class LinkLayer implements Dot11Interface {
 		watcher.start();
 		fState.start();
 	}
-
-	//private send function for retransmission and acks
-	/*
-	private void pSend(short dest, byte[] data, int len,boolean re, int retry, short type, short seqNum){
-		switch(type){
-		//data retransmissions
-		case DATAC:
-			int backoff = theRF.aCWmin;
-			try{
-				synchronized(this){wait(theRF.aSlotTime);}
-			}
-			catch(InterruptedException e)
-			{
-
-			}
-			if(!theRF.inUse()){
-				try{
-					synchronized(this){wait(theRF.aSlotTime);}
-				}
-				catch(InterruptedException e)
-				{
-
-				}
-				if(!theRF.inUse()){
-					theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqNum));
-				}
-			}
-
-			while(theRF.inUse()){
-				try{
-					wait((int)(theRF.aSlotTime+(backoff*Math.random())));
-				}
-				catch(InterruptedException e)
-				{
-
-				}
-				backoff=backoff^2;
-
-				if(backoff > theRF.aCWmax){
-					backoff = theRF.aCWmax;
-				}
-		}
-		case ACK:
-			try{
-				synchronized(this){wait(theRF.aSIFSTime);}
-			}
-			catch(InterruptedException e)
-			{
-
-			}
-			theRF.transmit(Packet.generatePacket(data,dest,ourMAC,ACK,re,seqNum));
-		}
-		//more for other stuff possibly
-	}
-	*/
-
-
-
 	//returns next sequence number for the given destination address -- maybe unnecessary
 	private short seqCheck(short addr)
 	{
@@ -124,7 +66,9 @@ public class LinkLayer implements Dot11Interface {
 		}
 	}
 
-
+	private void dPrint(String s){
+		if(debug != 0)output.println(s);
+	}
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
@@ -194,7 +138,7 @@ public class LinkLayer implements Dot11Interface {
 	 * the Transmission object.  See docs for full description.
 	 */
 	public int recv(Transmission t) {
-		output.println("LinkLayer: Pretending to block on recv()");
+		dPrint("LinkLayer: Pretending to block on recv()");
 		/*while(!theRF.dataWaiting()){
 			try{
 				wait(100);
@@ -249,7 +193,7 @@ public class LinkLayer implements Dot11Interface {
 	// 1 - success - 2 - unspecified error - 3 - RF init fail - 4 - last transm acked - 5 - last transm discarded
 	//  6 - bad buf. size - 7 - bad addr. - 8 - bad mac - 9 - illegal arg - 10 - insuf. buffer
 	public int status() {
-		output.println("LinkLayer: Faking a status() return value of 0");
+		dPrint("LinkLayer: Faking a status() return value of 0");
 		return 0;
 	}
 
@@ -257,7 +201,7 @@ public class LinkLayer implements Dot11Interface {
 	 * Passes command info to your link layer.  See docs for full description.
 	 */
 	public int command(int cmd, int val) {
-		output.println("LinkLayer: Sending command "+cmd+" with value "+val);
+		dPrint("LinkLayer: Sending command "+cmd+" with value "+val);
 		//TODO: Implement command codes
 		/*
 		 * Command 0: Options and settings
@@ -274,15 +218,15 @@ public class LinkLayer implements Dot11Interface {
 		 */
 		switch(cmd){
 		case 0:
-			output.println("====Command Settings====");
-			output.println("##Cmd 0: Display command options and current settings.");
-			output.println("Cmd 1: Set debug level. 0 for no debug output.");
-			output.println("Current debug level: "+debug);
-			output.println("##Cmd 2: Set slot selection mode. 0 for random, anything else to use MaxCW.");
-			output.println("Current mode: "+slotMode);
-			output.println("##Cmd 3: Set beacon interval, in seconds. -1 to disable beacons.");
-			output.println("Current interval: "+beaconInterval);
-			output.println("========================");
+			dPrint("====Command Settings====");
+			dPrint("##Cmd 0: Display command options and current settings.");
+			dPrint("Cmd 1: Set debug level. 0 for no debug output.");
+			dPrint("Current debug level: "+debug);
+			dPrint("##Cmd 2: Set slot selection mode. 0 for random, anything else to use MaxCW.");
+			dPrint("Current mode: "+slotMode);
+			dPrint("##Cmd 3: Set beacon interval, in seconds. -1 to disable beacons.");
+			dPrint("Current interval: "+beaconInterval);
+			dPrint("========================");
 			return 0;
 		case 1:
 			//Set debug level
