@@ -23,7 +23,7 @@ public class LinkLayer implements Dot11Interface {
 	private Queue<byte[]> dQueue; //send data queue
 	private HashMap<Short,Short[]> sequence; //current sequence number for each destination
 
-	enum State{IDLE,TRYSEND,TRYUPDATE}
+	enum State{IDLE,WANTSEND1,WANTSEND2,TRYSEND,MUSTWAIT,TRYUPDATE}
 	private Thread fState;
 	private Thread watcher; //thread around queue, watch for incoming data
 	private Queue<byte[]> rQueue; //receive data queue
@@ -65,7 +65,12 @@ public class LinkLayer implements Dot11Interface {
 			return sequence.get(addr)[1];
 		}
 	}
-
+	//function to streamline transmit mac processes
+	private void transmit(byte[] pack, boolean ack)
+	{
+		
+	}
+	//
 	private void dPrint(String s){
 		if(debug != 0)output.println(s);
 	}
@@ -274,8 +279,8 @@ public class LinkLayer implements Dot11Interface {
 
 
 		State currentState;
-		//sliding window
-		Queue<byte[]> sWindow;
+		int sDelay;//current delay range for waiting to send;
+		Queue<byte[]> sWindow;//sliding window
 
 		public FSM(){
 			currentState = State.IDLE;
@@ -289,48 +294,150 @@ public class LinkLayer implements Dot11Interface {
 				switch(currentState)
 				{
 				case IDLE://sleep till something changes
-					if(!dQueue.isEmpty()||!rQueue.isEmpty())
+					if(!rQueue.isEmpty())
 					{
-						currentState = State.TRYSEND;
+						currentState = State.TRYUPDATE;
 
 					}
+					else if(!dQueue.isEmpty())
+					{
+						currentState = State.WANTSEND1;
+					}
 					else{
+						//can change time if decide to use notifies;
 						try{Thread.sleep(100);}
 						catch(InterruptedException e)
 						{
 							//set status 2
 						}
+						break;
 					}
+				case WANTSEND1:
+					wCase();
+					break;
+				case WANTSEND2:
+					wCase();
+					break;
 				case TRYSEND://wait for update or new data
 					sCase();
+					break;
+				case MUSTWAIT://channel busy
+					iCase();
+					break;
 				case TRYUPDATE://wait for update
-					tCase();
+					uCase();
+					break;
+				}
+			}
+		}
+		// busy channel helper
+		void iCase()
+		{
+			//wait turn
+			try{
+				synchronized(this){
+					wait(RF.aSlotTime);
+				}
+			}
+			catch(InterruptedException e)
+			{
+				
+			}
+			if(theRF.inUse())
+			{
+				
+			}
+			else
+			{
+				currentState = State.WANTSEND1;
+			}
+		}
+		//not really necessary but makes commands easier to isolate
+		//handles command 2 changes -- need to check timing requirements if need to wait sifs
+		void nWait()
+		{
+			int next = sDelay;
+			if(slotMode != 0){
+				next = (int)(Math.random()*next);
+			}
+			try{
+				synchronized(this){
+					wait(next);
+				}
+			}
+			catch(InterruptedException e)
+			{
+				
+			}
+		}
+		//idle channel helper
+		void wCase(){
+			//-10 to remove header overhead
+			try{
+				synchronized(this){wait(RF.aSIFSTime);}
+			}
+			
+			catch(InterruptedException e)
+			{
+
+			}
+			if(theRF.inUse())
+			{
+				currentState = State.MUSTWAIT;
+				return;
+			}
+			else{
+				switch(currentState){
+				case WANTSEND2://actually try to send
+					sDelay = RF.aSlotTime;
+					currentState = State.TRYSEND;
+					break;
+				case WANTSEND1://pass to second try
+					currentState = State.WANTSEND2;
+					break;
+				default://should probably have error here, should never run this method from other states
 				}
 			}
 		}
 		//trysend helper
 		void sCase(){
-			if(dQueue.isEmpty() && rQueue.isEmpty()){//needs additional check if frame buffer empty
-				currentState= State.IDLE;
+			nWait();
+			if(theRF.transmit(dQueue.peek())== dQueue.peek().length){//if packet sends properly
+				sWindow.offer(dQueue.poll());
 			}
-			//insert code to check for acks
-			if(!dQueue.isEmpty())
+			else
 			{
-				byte[] target = dQueue.poll();
-				//insert mac protocol here
-				//insert command variable for cw stuff here
-				while(theRF.transmit(target)<=0);//need to change to actual check for correct number of bytes
-				sWindow.add(target);
-				dPrint("transmitted");
-
-			}
-			//include code to check if need to retransmit
-			if(false){//need check if frame buffer is full
-				currentState= State.TRYUPDATE;
-			}
+				if(theRF.inUse()){//exp backoff
+					sDelay = RF.aSlotTime;
+					currentState = State.MUSTWAIT;
+				}
+				else{
+					sDelay+=sDelay;
+				}
+			}		
 		}
-		void tCase(){
-			if(false){//need test if frame buffer no longer full
+		//update helper -- need to have code that causes update state check priorities.
+		void uCase(){
+			for(byte[] pack: rQueue)
+			{
+				Packet target = new Packet(pack);
+				for(byte[] slot : sWindow)
+				{
+					Packet p = new Packet(slot);
+					if(p.getDestAddr()==target.getSrcAddr()&&p.getSqnc()<=target.getSqnc())
+					{
+						sWindow.remove(p);
+					}
+				}
+				/*switch(target.getType())
+				{
+				case ACK:
+				case Beacon:
+				case RTS:
+				case CTS:
+				}*/
+			}
+			if(false){//need checks to see which state to return to
 				currentState=State.TRYSEND;
 			}
 		}
