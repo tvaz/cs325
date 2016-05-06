@@ -28,7 +28,7 @@ public class LinkLayer implements Dot11Interface {
 	private Thread watcher; //thread around queue, watch for incoming data
 	private Queue<byte[]> rQueue; //receive data queue
 
-	private int debug = 0;
+	private int debug = 1;
 	private int slotMode = 0;
 	private int beaconInterval = -1;
 
@@ -227,6 +227,7 @@ public class LinkLayer implements Dot11Interface {
 			dPrint("##Cmd 3: Set beacon interval, in seconds. -1 to disable beacons.");
 			dPrint("Current interval: "+beaconInterval);
 			dPrint("========================");
+			
 			return 0;
 		case 1:
 			//Set debug level
@@ -295,7 +296,7 @@ public class LinkLayer implements Dot11Interface {
 				//insert command variable for cw stuff here
 				while(theRF.transmit(target)<=0);//need to change to actual check for correct number of bytes
 				sWindow.add(target);
-				System.out.println("transmitted");
+				dPrint("transmitted");
 
 			}
 			//include code to check if need to retransmit
