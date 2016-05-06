@@ -125,7 +125,7 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	//actually prepares data for send and transfers reliability responsibility
 	public int send(short dest, byte[] data, int len) {
-		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0));
+		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
 		//notify thread if currently idle
 		return data.length;
 		//old code
@@ -305,6 +305,7 @@ public class LinkLayer implements Dot11Interface {
 				//insert command variable for cw stuff here
 				while(theRF.transmit(target)<=0);//need to change to actual check for correct number of bytes
 				sWindow.add(target);
+				System.out.println("transmitted");
 				
 			}
 			//include code to check if need to retransmit
