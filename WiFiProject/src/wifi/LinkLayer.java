@@ -1,6 +1,6 @@
 package wifi;
 import java.io.PrintWriter;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.HashMap;
 import java.util.Queue;
 
@@ -22,7 +22,7 @@ public class LinkLayer implements Dot11Interface {
 	private static final short RTS = 0x04;
 	private Queue<byte[]> dQueue; //send data queue
 	private HashMap<Short,Short[]> sequence; //current sequence number for each destination
-	enum State{IDLE,}
+	enum State{IDLE,TRYSEND,TRYUPDATE}
 	private Thread fState;
 	private Thread watcher; //thread around queue, watch for incoming data
 	private Queue<byte[]> rQueue; //receive data queue
@@ -35,10 +35,10 @@ public class LinkLayer implements Dot11Interface {
 	public LinkLayer(short ourMAC, PrintWriter output) {
 		this.ourMAC = ourMAC;
 		this.output = output;
-		theRF = new RF(null, null);
+		theRF = new RF(output, null);
 		output.println("LinkLayer: Constructor ran.");
-		dQueue = (Queue<byte[]>) new ArrayList<byte[]>();
-		rQueue = (Queue<byte[]>) new ArrayList<byte[]>();
+		dQueue = (Queue<byte[]>) new LinkedList<byte[]>();
+		rQueue = (Queue<byte[]>) new LinkedList<byte[]>();
 		sequence = new HashMap<Short,Short[]>();
 		//create background threads
 		fState = new Thread(new FSM());
@@ -125,7 +125,7 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	//actually prepares data for send and transfers reliability responsibility
 	public int send(short dest, byte[] data, int len) {
-		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
+		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0));
 		//notify thread if currently idle
 		return data.length;
 		//old code
@@ -239,6 +239,8 @@ public class LinkLayer implements Dot11Interface {
 	/**
 	 * Returns a current status code.  See docs for full description.
 	 */
+	// 1 - success - 2 - unspecified error - 3 - RF init fail - 4 - last transm acked - 5 - last transm discarded
+	//  6 - bad buf. size - 7 - bad addr. - 8 - bad mac - 9 - illegal arg - 10 - insuf. buffer
 	public int status() {
 		output.println("LinkLayer: Faking a status() return value of 0");
 		return 0;
@@ -256,14 +258,65 @@ public class LinkLayer implements Dot11Interface {
 
 
 		State currentState;
+		//sliding window
+		Queue<byte[]> sWindow;
 
 		public FSM(){
 			currentState = State.IDLE;
+			sWindow = (Queue<byte[]>) new LinkedList<byte[]>();
 		}
 		public void run(){
 			//Run stuff
+			while(true)
+			{
+				//wait here if necessary
+				switch(currentState)
+				{
+				case IDLE://sleep till something changes
+					if(!dQueue.isEmpty()||!rQueue.isEmpty())
+					{
+						currentState = State.TRYSEND;
+						
+					}
+					else{
+						try{Thread.sleep(100);}
+						catch(InterruptedException e)
+						{
+							//set status 2
+						}
+					}
+				case TRYSEND://wait for update or new data
+					sCase();
+				case TRYUPDATE://wait for update
+					tCase();
+				}
+			}
 		}
-
+		//trysend helper 
+		void sCase(){
+			if(dQueue.isEmpty() && rQueue.isEmpty()){//needs additional check if frame buffer empty
+				currentState= State.IDLE;
+			}
+			//insert code to check for acks
+			if(!dQueue.isEmpty())
+			{
+				byte[] target = dQueue.poll();
+				//insert mac protocol here
+				//insert command variable for cw stuff here
+				while(theRF.transmit(target)<=0);//need to change to actual check for correct number of bytes
+				sWindow.add(target);
+				
+			}
+			//include code to check if need to retransmit
+			if(false){//need check if frame buffer is full
+				currentState= State.TRYUPDATE;
+			}
+		}
+		void tCase(){
+			if(false){//need test if frame buffer no longer full
+				currentState=State.TRYSEND;
+			}
+		}
 	}
 	/**
 	 * back end recv stuff.
