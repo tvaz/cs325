@@ -98,15 +98,16 @@ public class LinkLayer implements Dot11Interface {
 			return 0;
 		}
 		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
-		return data.length;		
+		return data.length;
 
 	}
 	/**
 	 * Recv method blocks until data arrives, then writes it an address info into
 	 * the Transmission object.  See docs for full description.
 	 */
-	public int recv(Transmission t) {
-		dPrint("LinkLayer: Pretending to block on recv()");
+	public int recv(Transmission t) {	//TODO: Finish implementing the incrementing of sequence numbers
+		//TODO: all this
+		//dPrint("LinkLayer: Pretending to block on recv()");
 		/*while(!theRF.dataWaiting()){
 			try{
 				wait(100);
@@ -161,6 +162,7 @@ public class LinkLayer implements Dot11Interface {
 	// 1 - success - 2 - unspecified error - 3 - RF init fail - 4 - last transm acked - 5 - last transm discarded
 	//  6 - bad buf. size - 7 - bad addr. - 8 - bad mac - 9 - illegal arg - 10 - insuf. buffer
 	public int status() {
+		//TODO: update status codes properly in error handling
 		//dPrint("LinkLayer: Faking a status() return value of 0");
 		return status;
 	}
@@ -170,19 +172,6 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	public int command(int cmd, int val) {
 		dPrint("LinkLayer: Sending command "+cmd+" with value "+val);
-		/*
-		 * Command 0: Options and settings
-		 * Should summarize all command options and report their current settings. The accompanying value parameter is ignored.
-		 *
-		 * Command 1: Debug level.
-		 * The meaning of non-zero values can be implementation dependent, but passing a value of 0 should disable all debugging output.
-		 *
-		 * Command 2: Slot selection.
-		 * If the accompanying value parameter is 0 the link layer should select slots randomly. Any other value should cause the link layer to always select maxCW.
-		 *
-		 * Command 3: Beacon interval.
-		 * The accompanying value specifies the desired number of seconds between the start of beacon transmissions. A value of -1 should disable the sending of beacon frames.
-		 */
 		switch(cmd){
 		case 0:
 			//Display all options
@@ -256,6 +245,7 @@ public class LinkLayer implements Dot11Interface {
 				output.println("Beacon interval set to "+val+" seconds.");
 				return 0;
 			}
+		//TODO remember to take thsi out later
 		case 4:
 			output.println("Current status: "+status());
 			return 0;
@@ -273,6 +263,7 @@ public class LinkLayer implements Dot11Interface {
 			currentState = State.IDLE;
 		}
 		public void run(){
+			//TODO needs update code
 			//Run stuff
 			while(true)
 			{
@@ -418,6 +409,7 @@ public class LinkLayer implements Dot11Interface {
 
 		//update helper -- need to have code that causes update state check priorities.
 		void uCase(){
+			//TODO this
 			for(byte[] pack: rQueue)
 			{
 				Packet target = new Packet(pack);
@@ -466,20 +458,20 @@ public class LinkLayer implements Dot11Interface {
 					//check if wanted packet
 					if(temp.getType()== Beacon)
 					{
-						
+
 					}
 					else if (rQueue.size()>3)
 					{
-						
+
 					}
 					else{
 						switch(temp.getType()){
 							case DATAC:
-	
+
 								{
 									rQueue.offer(temp.pack);
 								}
-	
+
 							//code for sequence number checking
 							case ACK:; //code for updating sliding window
 							case CTS:;
