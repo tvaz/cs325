@@ -12,7 +12,7 @@ import rf.RF;
  * @author Cody Kagawa & Tori Vaz(richards)
  */
 public class LinkLayer implements Dot11Interface {
-	private RF theRF;           // You'll need one of these eventually
+	private RF theRF;           // RF layer
 	private short ourMAC;       // Our MAC address
 	private PrintWriter output; // The output stream we'll write to
 	/* Constants for packet types*/
@@ -37,7 +37,8 @@ public class LinkLayer implements Dot11Interface {
 	private int debug = 1;
 	private int slotMode = 0;
 	private int beaconInterval = -1;
-
+	//Current status
+	private int status = 1;
 
 	/**
 	 * Constructor takes a MAC address and the PrintWriter to which our output will
@@ -62,6 +63,7 @@ public class LinkLayer implements Dot11Interface {
 	}
 	//returns next sequence number for the given destination address -- maybe unnecessary
 	private short seqCheck(short addr)
+	//TODO: Finish implementing the incrementing of sequence numbers
 	{
 		if(sequence.get(addr)==null){
 			sequence.put(addr, new Short[]{0,0});
@@ -74,6 +76,7 @@ public class LinkLayer implements Dot11Interface {
 
 	//Print method that checks the debug level before deciding to print
 	private void dPrint(String s){
+		//TODO: add more debug print statements throughout the code
 		if(debug != 0)output.println(s);
 	}
 
@@ -201,8 +204,8 @@ public class LinkLayer implements Dot11Interface {
 	// 1 - success - 2 - unspecified error - 3 - RF init fail - 4 - last transm acked - 5 - last transm discarded
 	//  6 - bad buf. size - 7 - bad addr. - 8 - bad mac - 9 - illegal arg - 10 - insuf. buffer
 	public int status() {
-		dPrint("LinkLayer: Faking a status() return value of 0");
-		return 0;
+		//dPrint("LinkLayer: Faking a status() return value of 0");
+		return status;
 	}
 
 	/**
@@ -210,8 +213,6 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	public int command(int cmd, int val) {
 		dPrint("LinkLayer: Sending command "+cmd+" with value "+val);
-		//TODO: Implement command codes 2 and 3
-		//TODO: Make those values actually do something
 		/*
 		 * Command 0: Options and settings
 		 * Should summarize all command options and report their current settings. The accompanying value parameter is ignored.
@@ -298,6 +299,9 @@ public class LinkLayer implements Dot11Interface {
 				output.println("Beacon interval set to "+val+" seconds.");
 				return 0;
 			}
+		case 4:
+			output.println("Current status: "+status());
+			return 0;
 		}
 		return -1;
 	}

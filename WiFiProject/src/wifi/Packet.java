@@ -34,11 +34,13 @@ class Packet {
 		packet[1] = (byte)(seq & 0xff);
 		packet[2] = (byte) (dest >> 8);
 		packet[3] = (byte) dest;
-	  packet[4] = (byte) (home >> 8);
-	  packet[5] = (byte) home;
+		packet[4] = (byte) (home >> 8);
+
+	  	packet[5] = (byte) home;
 	    for(int i=0;i<src.length;i++){
 	        packet[i+6] = src[i];
 	    }
+
 	    //checksum goes here
 	    System.out.println("" + packet[0] + '\t' +packet[1] + '\t'+packet[2] + '\t' + packet[3]+ '\t'+packet[4] + '\t' + packet[5]);
 	    return packet;
