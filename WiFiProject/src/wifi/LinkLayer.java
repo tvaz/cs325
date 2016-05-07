@@ -108,38 +108,6 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	public int recv(Transmission t) {	//TODO: Finish implementing the incrementing of sequence numbers
 		//TODO: all this
-		//dPrint("LinkLayer: Pretending to block on recv()");
-		/*while(!theRF.dataWaiting()){
-			try{
-				wait(100);
-			}
-			catch(InterruptedException e)
-			{
-				return -1;
-			}
-		}
-		Packet temp = new Packet(theRF.receive());
-		if(temp.getDestAddr() == ourMAC || ){
-			//check if wanted packet
-			switch(temp.getType()){
-				case DATAC:
-					t.setBuf(temp.getData());
-					t.setDestAddr(temp.getDestAddr());
-					t.setSourceAddr(temp.getSrcAddr());
-					return temp.getData().length;
-				case ACK:;
-				case Beacon:;
-				case CTS:;
-				case RTS:;
-			}
-			//send ack?
-		}
-		//will eventually replace recursion with loop
-		else
-		{
-			return recv(t);
-		}
-		return 0;*/
 		while(rQueue.isEmpty())
 		{
 			try{
@@ -271,7 +239,7 @@ public class LinkLayer implements Dot11Interface {
 				//wait here if necessary
 				switch(currentState)
 				{
-				case IDLE://sleep till something changes
+				case IDLE://sleep till something changes-- also base state, used when next action is ambiguous
 					if(!cQueue.isEmpty())
 					{
 						currentState = State.TRYUPDATE;
@@ -319,13 +287,31 @@ public class LinkLayer implements Dot11Interface {
 				}
 			}
 		}
+		/* function to process refreshing sliding window, could use optimization time permitting*/
+		void update(){
+			//new send queue
+			Queue<byte[]> next = new LinkedList<byte[]>();
+			for(byte[] pack: sWindow)
+			{
+				Packet temp = new Packet(pack);
+				next.offer(Packet.generatePacket(temp.getData(), temp.getDestAddr(), temp.getSqnc(), temp.getType(), true, temp.getSqnc()));
+			}
+			for(byte[] pack: dQueue)
+			{
+				Packet temp = new Packet(pack);
+				next.offer(Packet.generatePacket(temp.getData(), temp.getDestAddr(), temp.getSqnc(), temp.getType(), temp.getRetry(), temp.getSqnc()));
+			}
+			dQueue = next;
+			sWindow = new LinkedList<byte[]>();
+		}
+		
 		// busy channel helper
 		void iCase()
 		{
 			//wait turn
 			try{
-				synchronized(this){
-					wait(RF.aSlotTime);
+				synchronized(this){//wait program refresh period; used to avoid busy wait when channel in use
+					wait(FRESHRATE);
 				}
 			}
 			catch(InterruptedException e)
@@ -338,7 +324,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 			else
 			{
-				try{//differ access difs wait
+				try{//defer access, difs wait
 					synchronized(this){
 						wait(DIFS);
 					}
@@ -355,6 +341,7 @@ public class LinkLayer implements Dot11Interface {
 		void nWait()
 		{
 			int next = sDelay;
+			if (next == RF.aCWmin) return;//first try should be 1 persistent, no wait besides difs
 			if(slotMode == 0){
 				next = (int)(Math.random()*next);
 			}
@@ -370,9 +357,8 @@ public class LinkLayer implements Dot11Interface {
 		}
 		//idle channel helper
 		void wCase(){
-			//-10 to remove header overhead
 			try{
-				synchronized(this){wait(RF.aSIFSTime);}
+				synchronized(this){wait(DIFS);}
 			}
 
 			catch(InterruptedException e)
@@ -387,13 +373,14 @@ public class LinkLayer implements Dot11Interface {
 			else{
 				switch(currentState){
 				case WANTSEND2://actually try to send
-					sDelay = RF.aSlotTime;
+					sDelay = RF.aCWmin;//reusing acwmin as flag for first time running, should cause 1 persistent immediate call for first attempt
 					currentState = State.TRYSEND;
 					break;
 				case WANTSEND1://pass to second try
 					currentState = State.WANTSEND2;
 					break;
-				default://should probably have error here, should never run this method from other states
+				default:
+					currentState = State.IDLE;//should probably have error here, should never run this method from other states
 				}
 			}
 		}
@@ -401,17 +388,18 @@ public class LinkLayer implements Dot11Interface {
 		void sCase(){ 
 			nWait();
 			if(theRF.transmit(dQueue.peek())== dQueue.peek().length){//if packet sends properly
-				sWindow.offer(dQueue.poll());
-				currentState = State.IDLE;
+				sWindow.offer(dQueue.poll());//add to sliding window
+				currentState = State.IDLE;//return to base state
 			}
 			else
 			{
 				if(theRF.inUse()){//exp backoff
-					sDelay = RF.aCWmin;
+					sDelay = RF.aCWmin;//throw away backoff, wait for next chance to send
 					currentState = State.MUSTWAIT;
 				}
 				else{
-					sDelay+=sDelay;
+					sDelay+=sDelay;//double collision window
+					if(sDelay > RF.aCWmax)sDelay = RF.aCWmax;// cap at maximum collision window size
 				}
 			}
 
@@ -464,7 +452,7 @@ public class LinkLayer implements Dot11Interface {
 				}
 				//fix this when switch to array
 				Packet temp = new Packet(theRF.receive());
-				if(temp.getDestAddr() == ourMAC){
+				if(temp.getDestAddr() == ourMAC||temp.getDestAddr()==-1){
 					//check if wanted packet
 					if(temp.getType()== Beacon)
 					{
