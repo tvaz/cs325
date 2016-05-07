@@ -15,19 +15,25 @@ public class LinkLayer implements Dot11Interface {
 	private RF theRF;           // You'll need one of these eventually
 	private short ourMAC;       // Our MAC address
 	private PrintWriter output; // The output stream we'll write to
+	/* Constants for packet types*/
 	private static final short DATAC = 0x00;
 	private static final short ACK = 0x01;
 	private static final short Beacon = 0x02;
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
+	/**/
+
 	private Queue<byte[]> dQueue; //send data queue
 	private HashMap<Short,Short[]> sequence; //current sequence number for each destination
 
+	//Enumerated states for internal FSM
 	enum State{IDLE,WANTSEND1,WANTSEND2,TRYSEND,MUSTWAIT,TRYUPDATE}
+
 	private Thread fState;
 	private Thread watcher; //thread around queue, watch for incoming data
 	private Queue<byte[]> rQueue; //receive data queue
 
+	/*State variables for link layer options*/
 	private int debug = 1;
 	private int slotMode = 0;
 	private int beaconInterval = -1;
@@ -65,15 +71,12 @@ public class LinkLayer implements Dot11Interface {
 			return sequence.get(addr)[1];
 		}
 	}
-	//function to streamline transmit mac processes
-	private void transmit(byte[] pack, boolean ack)
-	{
-		
-	}
-	//
+
+	//Print method that checks the debug level before deciding to print
 	private void dPrint(String s){
 		if(debug != 0)output.println(s);
 	}
+
 	/**
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
@@ -225,6 +228,7 @@ public class LinkLayer implements Dot11Interface {
 		switch(cmd){
 		case 0:
 			//Display all options
+			output.println("");
 			output.println("====Command Settings====");
 			output.println("##Cmd 0: Display command options and current settings.");
 			output.println("Cmd 1: Set debug level. 0 for no debug output, 1 for full.");
@@ -247,6 +251,7 @@ public class LinkLayer implements Dot11Interface {
 			output.println("Current interval: "+beaconInterval);
 			}
 			output.println("========================");
+			output.println("");
 			return 0;
 		case 1:
 			//Set debug level
@@ -267,21 +272,37 @@ public class LinkLayer implements Dot11Interface {
 			//If 0, switch to Random slot selection mode
 			//Any other value, switch to always select maxCW
 			switch(val){
-
+			case 0:
+				slotMode = 0;
+				output.println("Using random slot selection mode.");
+				return 0;
+			default:
+				slotMode = 1;
+				output.println("Using maxCW slot selection mode.");
+				return 0;
 			}
-			return 0;
 		case 3:
 			//-1 Disable beacon frames
 			//Otherwise, val will specify # of seconds
 			//between start of beacons
-			return 0;
+			switch(val){
+			case -1:
+				beaconInterval = -1;
+				output.println("Beacons disabled.");
+				return 0;
+			case 0:
+				output.println("Proabably shouldn't set interval to 0 seconds.");
+				return -1;
+			default:
+				beaconInterval = val;
+				output.println("Beacon interval set to "+val+" seconds.");
+				return 0;
+			}
 		}
 		return -1;
 	}
 
 	class FSM implements Runnable{
-
-
 		State currentState;
 		int sDelay;//current delay range for waiting to send;
 		Queue<byte[]> sWindow;//sliding window
@@ -345,11 +366,11 @@ public class LinkLayer implements Dot11Interface {
 			}
 			catch(InterruptedException e)
 			{
-				
+
 			}
 			if(theRF.inUse())
 			{
-				
+
 			}
 			else
 			{
@@ -371,7 +392,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 			catch(InterruptedException e)
 			{
-				
+
 			}
 		}
 		//idle channel helper
@@ -380,7 +401,7 @@ public class LinkLayer implements Dot11Interface {
 			try{
 				synchronized(this){wait(RF.aSIFSTime);}
 			}
-			
+
 			catch(InterruptedException e)
 			{
 
@@ -418,7 +439,7 @@ public class LinkLayer implements Dot11Interface {
 				else{
 					sDelay+=sDelay;
 				}
-			}		
+			}
 
 		}
 
