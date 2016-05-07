@@ -21,8 +21,8 @@ public class LinkLayer implements Dot11Interface {
 	private static final short DATAC = 0x00;
 	private static final short ACK = 0x01;
 	private static final short Beacon = 0x02;
-	private static final short CTS = 0x03;
-	private static final short RTS = 0x04;
+	//private static final short CTS = 0x03;
+	//private static final short RTS = 0x04;
 	private static final int DIFS = RF.aSIFSTime*2;
 	/**/
 
@@ -119,7 +119,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 		}
 		Packet temp = new Packet(theRF.receive());
-		if(temp.getDestAddr() == ourMAC){
+		if(temp.getDestAddr() == ourMAC || ){
 			//check if wanted packet
 			switch(temp.getType()){
 				case DATAC:
