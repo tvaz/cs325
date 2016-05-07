@@ -1,6 +1,7 @@
 package wifi;
 
 import java.util.Arrays;
+import java.util.zip.CRC32;
 
 class Packet {
 	byte[] pack;
@@ -22,6 +23,7 @@ class Packet {
 		//Control, then Dest Addr, then Src Addr, the Data, and Checksum
 		// [2][2][2][0-2038][4] Bytes
 		// Control : Frame Type, Retry, Sequence [3][1][12] Bits
+		CRC32 check = new CRC32();
 		int size = src.length+10;
 
 		byte[] packet = new byte[size];
@@ -40,9 +42,13 @@ class Packet {
 	    for(int i=0;i<src.length;i++){
 	        packet[i+6] = src[i];
 	    }
-
+	    check.update(packet,0,packet.length-4);
+	    packet[packet.length-4] = (byte)(check.getValue()>>24);
+	    packet[packet.length-3] = (byte)(check.getValue()>>16);
+	    packet[packet.length-2] = (byte)(check.getValue()>>8);
+	    packet[packet.length-1] = (byte)(check.getValue());
 	    //checksum goes here
-	    System.out.println("" + packet[0] + '\t' +packet[1] + '\t'+packet[2] + '\t' + packet[3]+ '\t'+packet[4] + '\t' + packet[5]);
+	    System.out.println("" + packet[0] + '\t' +packet[1] + '\t'+packet[2] + '\t' + packet[3]+ '\t'+packet[4] + '\t' + packet[5] );
 	    return packet;
 	}
 
@@ -76,5 +82,16 @@ class Packet {
 	public byte[] getData()
 	{
 		return Arrays.copyOfRange(pack,6,pack.length-4);
+	}
+	public long getCRC()
+	{
+		return 0 ;
+				//Arrays.copyOfRange(pack,pack.length-4,pack.length-1);
+	}
+	public static boolean validate(Packet p)//compare wrapper packet against created packet for same crc
+	{
+		CRC32 c = new CRC32();
+		c.update(p.pack, 0, p.pack.length - 4);
+		return p.getCRC() == c.getValue();
 	}
 }
