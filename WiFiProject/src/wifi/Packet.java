@@ -51,7 +51,7 @@ class Packet {
 	    packet[packet.length-2] = (byte)(check.getValue()>>8);
 	    packet[packet.length-1] = (byte)(check.getValue());
 
-		System.out.print("Computed CRC: "+convCrcToLong(packet));
+		System.out.println("Computed CRC: "+convCrcToLong(packet));
 
 
 		//checksum goes here
@@ -63,32 +63,40 @@ class Packet {
 	{
 		//return sequence #
 		short t=(short)(pack[0] & 0x0f);
+		System.out.println("getsqnc: "+t);
 		return (short)((t<<8) + pack[1]);
 	}
 	public boolean getRetry()
 	{
-		return (8 & pack[0])>0;
+		boolean retry = (8 & pack[0])>0;
+		System.out.println("retry: "+retry);
+		return retry;
 	}
 	public short getType()
 	{
 		//frame type
-		return (short)(pack[0]>>5);
+		short t = (short)(pack[0]>>5);
+		System.out.println("type: "+t);
+		return t;
 	}
 	public short getDestAddr()
 	{
 	    short adr = (short)( ((pack[2]&0xFF)<<8) | (pack[3]&0xFF) );
+		System.out.println("destaddr: "+adr);
 		return adr;
 
 	}
 	public short getSrcAddr()
 	{
-		//return source MAC
-		short t=pack[4];
-		return (short)((t<<8) + pack[5]);
+	    short adr = (short)( ((pack[4]&0xFF)<<8) | (pack[5]&0xFF) );
+		System.out.println("hostaddr: "+adr);
+		return adr;
 	}
 	public byte[] getData()
 	{
-		return Arrays.copyOfRange(pack,6,pack.length-4);
+		byte[] ary = Arrays.copyOfRange(pack,6,pack.length-4);
+		System.out.println("data: "+ary);
+		return ary;
 	}
 	public long getCRC()
 	{
@@ -98,7 +106,7 @@ class Packet {
 	}
 	public static long convCrcToLong(byte[] packet){
 		ByteBuffer buf = ByteBuffer.allocate(Integer.BYTES);
-	    byte[] check = Arrays.copyOfRange(packet,pack.length-4,packet.length);
+	    byte[] check = Arrays.copyOfRange(packet,packet.length-4,packet.length);
 	    buf.put(check);
 	      buf.flip();
 	      long crc_long = buf.getInt();
