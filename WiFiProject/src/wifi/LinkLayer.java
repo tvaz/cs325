@@ -6,7 +6,7 @@ import java.util.Queue;
 
 import rf.RF;
 
-/**
+/*
  * Use this layer as a starting point for your project code.  See {@link Dot11Interface} for more
  * details on these routines.
  * @author Cody Kagawa & Tori Vaz(richards)
@@ -87,7 +87,7 @@ public class LinkLayer implements Dot11Interface {
 		if(debug != 0)output.println(s);
 	}
 
-	/**
+	/*
 	 * Send method takes a destination, a buffer (array) of data, and the number
 	 * of bytes to send.  See docs for full description.
 	 *
@@ -102,7 +102,7 @@ public class LinkLayer implements Dot11Interface {
 		return data.length;
 
 	}
-	/**
+	/*
 	 * Recv method blocks until data arrives, then writes it an address info into
 	 * the Transmission object.  See docs for full description.
 	 */
@@ -304,7 +304,7 @@ public class LinkLayer implements Dot11Interface {
 			dQueue = next;
 			sWindow = new LinkedList<byte[]>();
 		}
-		
+
 		// busy channel helper
 		void iCase()
 		{
@@ -385,7 +385,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 		}
 		//trysend helper
-		void sCase(){ 
+		void sCase(){
 			nWait();
 			if(theRF.transmit(dQueue.peek())== dQueue.peek().length){//if packet sends properly
 				sWindow.offer(dQueue.poll());//add to sliding window
@@ -465,7 +465,6 @@ public class LinkLayer implements Dot11Interface {
 					else{
 						switch(temp.getType()){
 							case DATAC:
-
 								{
 									rQueue.offer(temp.pack);
 								}
