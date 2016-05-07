@@ -27,7 +27,7 @@ public class LinkLayer implements Dot11Interface {
 	private Thread fState;
 	private Thread watcher; //thread around queue, watch for incoming data
 	private Queue<byte[]> rQueue; //receive data queue
-
+	private Queue<byte[]> cQueue; //pass data for update to process
 	private int debug = 1;
 	private int slotMode = 0;
 	private int beaconInterval = -1;
@@ -46,6 +46,7 @@ public class LinkLayer implements Dot11Interface {
 		dPrint("LinkLayer: Constructor ran.");
 		dQueue = (Queue<byte[]>) new LinkedList<byte[]>();
 		rQueue = (Queue<byte[]>) new LinkedList<byte[]>();
+		cQueue = (Queue<byte[]>) new LinkedList<byte[]>();
 		sequence = new HashMap<Short,Short[]>();
 		//create background threads
 		fState = new Thread(new FSM());
@@ -65,11 +66,6 @@ public class LinkLayer implements Dot11Interface {
 			return sequence.get(addr)[1];
 		}
 	}
-	//function to streamline transmit mac processes
-	private void transmit(byte[] pack, boolean ack)
-	{
-		
-	}
 	//
 	private void dPrint(String s){
 		if(debug != 0)output.println(s);
@@ -83,6 +79,8 @@ public class LinkLayer implements Dot11Interface {
 	public int send(short dest, byte[] data, int len) {
 		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
 		//notify thread if currently idle
+
+		System.out.println(data.length);
 		return data.length;
 		//old code
 		/*int backoff = theRF.aCWmin;
@@ -294,7 +292,7 @@ public class LinkLayer implements Dot11Interface {
 				switch(currentState)
 				{
 				case IDLE://sleep till something changes
-					if(!rQueue.isEmpty())
+					if(!cQueue.isEmpty())
 					{
 						currentState = State.TRYUPDATE;
 
@@ -357,7 +355,7 @@ public class LinkLayer implements Dot11Interface {
 		void nWait()
 		{
 			int next = sDelay;
-			if(slotMode != 0){
+			if(slotMode == 0){
 				next = (int)(Math.random()*next);
 			}
 			try{
@@ -404,6 +402,7 @@ public class LinkLayer implements Dot11Interface {
 			nWait();
 			if(theRF.transmit(dQueue.peek())== dQueue.peek().length){//if packet sends properly
 				sWindow.offer(dQueue.poll());
+				currentState = State.IDLE;
 			}
 			else
 			{
@@ -429,13 +428,6 @@ public class LinkLayer implements Dot11Interface {
 						sWindow.remove(p);
 					}
 				}
-				/*switch(target.getType())
-				{
-				case ACK:
-				case Beacon:
-				case RTS:
-				case CTS:
-				}*/
 			}
 			if(false){//need checks to see which state to return to
 				currentState=State.TRYSEND;
