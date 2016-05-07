@@ -51,8 +51,7 @@ class Packet {
 	    packet[packet.length-2] = (byte)(check.getValue()>>8);
 	    packet[packet.length-1] = (byte)(check.getValue());
 
-		System.out.println("Computed crc: "+packet[packet.length-4]+" "+packet[packet.length-3]+" "+packet[packet.length-2]+" "+packet[packet.length-1]);
-
+		System.out.print("Computed CRC: "+convCrcToLong(packet));
 
 
 		//checksum goes here
@@ -93,21 +92,19 @@ class Packet {
 	}
 	public long getCRC()
 	{
-
+		long crc = convCrcToLong(pack);
+	     System.out.println("Grabbed CRC:"+crc);
+	     return crc;
+	}
+	public static long convCrcToLong(byte[] packet){
 		ByteBuffer buf = ByteBuffer.allocate(Integer.BYTES);
-	    byte[] check = Arrays.copyOfRange(pack,pack.length-4,pack.length);
-
-	    System.out.println("Printing CRC grabbed:");
-	    for(int i=0;i<check.length;i++){
-		System.out.print(check[i]+" ");
-	    }
-	    System.out.println("Done printing CRC.");
-
+	    byte[] check = Arrays.copyOfRange(packet,pack.length-4,packet.length);
 	    buf.put(check);
 	      buf.flip();
 	      long crc_long = buf.getInt();
 		return crc_long;
 	}
+
 	public static boolean validate(Packet p)//compare wrapper packet against created packet for same crc
 	{
 		CRC32 c = new CRC32();
