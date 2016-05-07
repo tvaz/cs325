@@ -388,7 +388,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 		}
 		//trysend helper
-		void sCase(){
+		void sCase(){ 
 			nWait();
 			if(theRF.transmit(dQueue.peek())== dQueue.peek().length){//if packet sends properly
 				sWindow.offer(dQueue.poll());
