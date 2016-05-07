@@ -15,6 +15,8 @@ public class LinkLayer implements Dot11Interface {
 	private RF theRF;           // RF layer
 	private short ourMAC;       // Our MAC address
 	private PrintWriter output; // The output stream we'll write to
+	/* constant for debug purposes, how often code checks for changes*/
+	static final short FRESHRATE = 100; //refresh interval
 	/* Constants for packet types*/
 	private static final short DATAC = 0x00;
 	private static final short ACK = 0x01;
@@ -23,6 +25,7 @@ public class LinkLayer implements Dot11Interface {
 	private static final short RTS = 0x04;
 	/**/
 
+	Queue<byte[]> sWindow;//sliding window
 	private Queue<byte[]> dQueue; //send data queue
 	private HashMap<Short,Short[]> sequence; //current sequence number for each destination
 
@@ -52,6 +55,7 @@ public class LinkLayer implements Dot11Interface {
 		this.output = output;
 		theRF = new RF(output, null);
 		dPrint("LinkLayer: Constructor ran.");
+		sWindow = (Queue<byte[]>) new LinkedList<byte[]>();
 		dQueue = (Queue<byte[]>) new LinkedList<byte[]>();
 		rQueue = (Queue<byte[]>) new LinkedList<byte[]>();
 		cQueue = (Queue<byte[]>) new LinkedList<byte[]>();
@@ -89,63 +93,12 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	//actually prepares data for send and transfers reliability responsibility
 	public int send(short dest, byte[] data, int len) {
-		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
-		//notify thread if currently idle
-
-		System.out.println(data.length);
-		return data.length;
-		//old code
-		/*int backoff = theRF.aCWmin;
-
-		output.println("LinkLayer: Sending "+len+" bytes to "+dest);
-		//-10 to remove header overhead
-		try{
-			synchronized(this){wait(theRF.aSlotTime);}
-		}
-		catch(InterruptedException e)
+		if(dQueue.size()+sWindow.size()>3)
 		{
-
+			return 0;
 		}
-		if(!theRF.inUse()){
-			try{
-				synchronized(this){Thread.sleep(theRF.aSIFSTime);}
-			}
-			catch(InterruptedException e)
-			{
-
-			}
-			if(!theRF.inUse()){
-				int c = theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest))) -10;
-				//there should be some checks here and proper handling of next sequence number for dest
-
-				System.out.println(sequence.get(dest)[1]);
-				return c;
-			}
-		}
-
-		while(theRF.inUse()){
-			try{
-				wait((int)(theRF.aSlotTime+(backoff*Math.random())));
-			}
-			catch(InterruptedException e)
-			{
-
-			}
-			backoff=backoff^2;
-
-			if(backoff > theRF.aCWmax){
-				backoff = theRF.aCWmax;
-			}
-		}
-
-
-		//return theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
-		//call recv for ack?
-
-		int retrn = theRF.transmit(Packet.generatePacket(data,dest,ourMAC,DATAC,false,(short)0)) -10;
-
-		//?
-		return retrn;*/
+		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
+		return data.length;		
 
 	}
 	/**
@@ -188,7 +141,7 @@ public class LinkLayer implements Dot11Interface {
 		while(rQueue.isEmpty())
 		{
 			try{
-				synchronized(this){wait(100);}
+				synchronized(this){wait(FRESHRATE);}
 			}
 			catch(InterruptedException e)
 			{
@@ -313,11 +266,11 @@ public class LinkLayer implements Dot11Interface {
 	class FSM implements Runnable{
 		State currentState;
 		int sDelay;//current delay range for waiting to send;
-		Queue<byte[]> sWindow;//sliding window
+		static final long TOPERIOD = 10000; //time out period
+		long timeout; //time from which timeout is calculated
 
 		public FSM(){
 			currentState = State.IDLE;
-			sWindow = (Queue<byte[]>) new LinkedList<byte[]>();
 		}
 		public void run(){
 			//Run stuff
@@ -338,11 +291,12 @@ public class LinkLayer implements Dot11Interface {
 					}
 					else{
 						//can change time if decide to use notifies;
-						try{Thread.sleep(100);}
+						try{Thread.sleep(FRESHRATE);}
 						catch(InterruptedException e)
 						{
 							//set status 2
 						}
+						timeout = theRF.clock();
 						break;
 					}
 				case WANTSEND1:
@@ -360,6 +314,16 @@ public class LinkLayer implements Dot11Interface {
 				case TRYUPDATE://wait for update
 					uCase();
 					break;
+				}
+				//timeout code
+				if(theRF.clock()-timeout>TOPERIOD)
+				{
+					Queue<byte[]> temp = new LinkedList<byte[]>();
+					for(byte[] b: sWindow)
+					{
+						Packet p = new Packet(b);
+						temp.offer(Packet.generatePacket(p.getData(),p.getDestAddr(),p.getSrcAddr(),p.getType(),true,p.getSqnc()));
+					}
 				}
 			}
 		}
@@ -442,7 +406,7 @@ public class LinkLayer implements Dot11Interface {
 			else
 			{
 				if(theRF.inUse()){//exp backoff
-					sDelay = RF.aSlotTime;
+					sDelay = RF.aCWmin;
 					currentState = State.MUSTWAIT;
 				}
 				else{
@@ -476,7 +440,8 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	class Rcver implements Runnable
 	{
-		private static final short FRESHRATE = 100; //refresh interval
+		/*offset for use with beacon, used for clock synchronization*/
+		int offset;
 		Rcver()
 		{
 		}
@@ -499,18 +464,27 @@ public class LinkLayer implements Dot11Interface {
 				Packet temp = new Packet(theRF.receive());
 				if(temp.getDestAddr() == ourMAC){
 					//check if wanted packet
-					switch(temp.getType()){
-						case DATAC:
-
-							{
-								rQueue.offer(temp.pack);
-							}
-
-						//code for sequence number checking
-						case ACK: //code for updating sliding window;
-						case Beacon:;
-						case CTS:;
-						case RTS:;
+					if(temp.getType()== Beacon)
+					{
+						
+					}
+					else if (rQueue.size()>3)
+					{
+						
+					}
+					else{
+						switch(temp.getType()){
+							case DATAC:
+	
+								{
+									rQueue.offer(temp.pack);
+								}
+	
+							//code for sequence number checking
+							case ACK:; //code for updating sliding window
+							case CTS:;
+							case RTS:;
+						}
 					}
 				}
 			}
