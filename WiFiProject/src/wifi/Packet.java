@@ -1,10 +1,12 @@
 package wifi;
 
 import java.util.Arrays;
+import java.nio.ByteBuffer;
 import java.util.zip.CRC32;
 
 class Packet {
 	byte[] pack;
+
 	public Packet(byte[] src) {
 		pack = src;// TODO Auto-generated constructor stub
 	}
@@ -42,12 +44,18 @@ class Packet {
 	    for(int i=0;i<src.length;i++){
 	        packet[i+6] = src[i];
 	    }
+
 	    check.update(packet,0,packet.length-4);
 	    packet[packet.length-4] = (byte)(check.getValue()>>24);
 	    packet[packet.length-3] = (byte)(check.getValue()>>16);
 	    packet[packet.length-2] = (byte)(check.getValue()>>8);
 	    packet[packet.length-1] = (byte)(check.getValue());
-	    //checksum goes here
+
+		System.out.println("Computed crc: "+packet[packet.length-4]+" "+packet[packet.length-3]+" "+packet[packet.length-2]+" "+packet[packet.length-1]);
+
+
+
+		//checksum goes here
 	    System.out.println("" + packet[0] + '\t' +packet[1] + '\t'+packet[2] + '\t' + packet[3]+ '\t'+packet[4] + '\t' + packet[5] );
 	    return packet;
 	}
@@ -69,9 +77,9 @@ class Packet {
 	}
 	public short getDestAddr()
 	{
-		//return dest MAC
-		short t=pack[2];
-		return (short)((t<<8) + pack[3]);
+	    short adr = (short)( ((pack[2]&0xFF)<<8) | (pack[3]&0xFF) );
+		return adr;
+
 	}
 	public short getSrcAddr()
 	{
@@ -85,8 +93,16 @@ class Packet {
 	}
 	public long getCRC()
 	{
+		System.out.println("Getting CRC.");
+		ByteBuffer buf = ByteBuffer.allocate(Long.BYTES);
+	    byte[] crc = new byte[4];
+	    byte[] check = Arrays.copyOfRange(pack,pack.length-4,pack.length-1);
+	    System.out.println("Printing CRC grabbed:");
+	    for(int i=0;i<check.length;i++){
+		System.out.print(check[i]+" ");
+	    }
+	    System.out.println("Done printing CRC.");
 		return 0 ;
-				//Arrays.copyOfRange(pack,pack.length-4,pack.length-1);
 	}
 	public static boolean validate(Packet p)//compare wrapper packet against created packet for same crc
 	{
