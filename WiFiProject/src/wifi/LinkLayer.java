@@ -23,6 +23,7 @@ public class LinkLayer implements Dot11Interface {
 	private static final short Beacon = 0x02;
 	private static final short CTS = 0x03;
 	private static final short RTS = 0x04;
+	private static final int DIFS = RF.aSIFSTime*2;
 	/**/
 
 	Queue<byte[]> sWindow;//sliding window
@@ -346,7 +347,16 @@ public class LinkLayer implements Dot11Interface {
 			}
 			else
 			{
-				currentState = State.WANTSEND1;
+				try{//differ access difs wait
+					synchronized(this){
+						wait(DIFS);
+					}
+				}
+				catch(InterruptedException e)
+				{
+
+				}
+				currentState = State.TRYSEND;//immediately try to send
 			}
 		}
 		//not really necessary but makes commands easier to isolate
@@ -481,9 +491,7 @@ public class LinkLayer implements Dot11Interface {
 								}
 	
 							//code for sequence number checking
-							case ACK:; //code for updating sliding window
-							case CTS:;
-							case RTS:;
+							case ACK:cQueue.offer(temp.pack); //code for updating sliding window
 						}
 					}
 				}
