@@ -202,7 +202,8 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	public int command(int cmd, int val) {
 		dPrint("LinkLayer: Sending command "+cmd+" with value "+val);
-		//TODO: Implement command codes
+		//TODO: Implement command codes 2 and 3
+		//TODO: Make those values actually do something
 		/*
 		 * Command 0: Options and settings
 		 * Should summarize all command options and report their current settings. The accompanying value parameter is ignored.
@@ -260,6 +261,9 @@ public class LinkLayer implements Dot11Interface {
 		case 2:
 			//If 0, switch to Random slot selection mode
 			//Any other value, switch to always select maxCW
+			switch(val){
+
+			}
 			return 0;
 		case 3:
 			//-1 Disable beacon frames
@@ -325,12 +329,12 @@ public class LinkLayer implements Dot11Interface {
 
 			}
 			//include code to check if need to retransmit
-			if(false){//need check if frame buffer is full
+			if(false){ //need check if frame buffer is full
 				currentState= State.TRYUPDATE;
 			}
 		}
 		void tCase(){
-			if(false){//need test if frame buffer no longer full
+			if(false){ //need test if frame buffer no longer full
 				currentState=State.TRYSEND;
 			}
 		}
