@@ -93,16 +93,20 @@ class Packet {
 	}
 	public long getCRC()
 	{
-		System.out.println("Getting CRC.");
-		ByteBuffer buf = ByteBuffer.allocate(Long.BYTES);
-	    byte[] crc = new byte[4];
-	    byte[] check = Arrays.copyOfRange(pack,pack.length-4,pack.length-1);
+
+		ByteBuffer buf = ByteBuffer.allocate(Integer.BYTES);
+	    byte[] check = Arrays.copyOfRange(pack,pack.length-4,pack.length);
+
 	    System.out.println("Printing CRC grabbed:");
 	    for(int i=0;i<check.length;i++){
 		System.out.print(check[i]+" ");
 	    }
 	    System.out.println("Done printing CRC.");
-		return 0 ;
+
+	    buf.put(check);
+	      buf.flip();
+	      long crc_long = buf.getInt();
+		return crc_long;
 	}
 	public static boolean validate(Packet p)//compare wrapper packet against created packet for same crc
 	{
