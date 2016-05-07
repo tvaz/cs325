@@ -28,8 +28,10 @@ public class LinkLayer implements Dot11Interface {
 
 	Queue<byte[]> sWindow;//sliding window
 	private Queue<byte[]> dQueue; //send data queue
-	private HashMap<Short,Short[]> sequence; //current sequence number for each destination
-
+	
+	// size 3 array [last acked sqnc#,last sent sqnc#,sqnc# of last packet from this addr(for receives)]
+	private HashMap<Short,Short[]> sequence; 
+	
 	//Enumerated states for internal FSM
 	enum State{IDLE,WANTSEND1,WANTSEND2,TRYSEND,MUSTWAIT,TRYUPDATE}
 
@@ -73,7 +75,7 @@ public class LinkLayer implements Dot11Interface {
 	//TODO: Finish implementing the incrementing of sequence numbers
 	{
 		if(sequence.get(addr)==null){
-			sequence.put(addr, new Short[]{0,0});
+			sequence.put(addr, new Short[]{0,0,-1});
 			return 0;
 		}
 		else{
@@ -94,11 +96,15 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	//actually prepares data for send and transfers reliability responsibility
 	public int send(short dest, byte[] data, int len) {
-		if(dQueue.size()+sWindow.size()>3)
+		synchronized(dQueue){if(dQueue.size()+sWindow.size()>3)//make sure code isnt mid-update before calculating size
 		{
 			return 0;
-		}
+		}}
 		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
+		Short[] nSeq = sequence.get(dest);
+		++nSeq[1];
+		sequence.put(dest,nSeq);
+		//fake confirm of data sent, true to actual except when unanticipated queue error occurs
 		return data.length;
 
 	}
@@ -225,17 +231,25 @@ public class LinkLayer implements Dot11Interface {
 	class FSM implements Runnable{
 		State currentState;
 		int sDelay;//current delay range for waiting to send;
-		static final long TOPERIOD = 10000; //time out period
+		static final long TOPERIOD = 1000; //time out period
 		long timeout; //time from which timeout is calculated
+		HashMap<byte[],Integer> rWatch;
 
 		public FSM(){
 			currentState = State.IDLE;
+			rWatch = new HashMap<byte[],Integer>();
+			timeout = -1;
 		}
 		public void run(){
 			//TODO needs update code
 			//Run stuff
 			while(true)
 			{
+				//timeout code
+				if( timeout>=0 && theRF.clock()-timeout>TOPERIOD)
+				{
+					update();
+				}
 				//wait here if necessary
 				switch(currentState)
 				{
@@ -256,7 +270,7 @@ public class LinkLayer implements Dot11Interface {
 						{
 							//set status 2
 						}
-						timeout = theRF.clock();
+						timeout = -1;
 						break;
 					}
 				case WANTSEND1:
@@ -275,34 +289,40 @@ public class LinkLayer implements Dot11Interface {
 					uCase();
 					break;
 				}
-				//timeout code
-				if(theRF.clock()-timeout>TOPERIOD)
-				{
-					Queue<byte[]> temp = new LinkedList<byte[]>();
-					for(byte[] b: sWindow)
-					{
-						Packet p = new Packet(b);
-						temp.offer(Packet.generatePacket(p.getData(),p.getDestAddr(),p.getSrcAddr(),p.getType(),true,p.getSqnc()));
-					}
-				}
+				
+				
 			}
 		}
+		/* private helper, handles retry limit*/
+				
 		/* function to process refreshing sliding window, could use optimization time permitting*/
 		void update(){
-			//new send queue
-			Queue<byte[]> next = new LinkedList<byte[]>();
-			for(byte[] pack: sWindow)
-			{
-				Packet temp = new Packet(pack);
-				next.offer(Packet.generatePacket(temp.getData(), temp.getDestAddr(), temp.getSqnc(), temp.getType(), true, temp.getSqnc()));
+			synchronized(dQueue){// no adding to dqueue while this goes on, sWindow shouldn't matter if in this method
+				//new send queue
+				Queue<byte[]> next = new LinkedList<byte[]>();
+				for(byte[] pack: sWindow)
+				{
+					Packet temp = new Packet(pack);// make old packet's data accessible
+					if(rWatch.get(pack)>=RF.dot11RetryLimit)//too many retries
+					{
+						;// don't add to new sliding window
+					}
+					//resend if not at retry limit
+					else{
+						byte[] t = Packet.generatePacket(temp.getData(), temp.getDestAddr(), temp.getSqnc(), temp.getType(), true, temp.getSqnc());
+						next.offer(t);
+						rWatch.put(t, (rWatch.get(pack)+1));
+					}
+					rWatch.remove(pack);
+				}
+				//put all the ToSend stuff back
+				next.addAll(dQueue);
+				//replace the old queues
+				dQueue = next;
+				sWindow = new LinkedList<byte[]>();
+				//reset timer
+				timeout = theRF.clock();
 			}
-			for(byte[] pack: dQueue)
-			{
-				Packet temp = new Packet(pack);
-				next.offer(Packet.generatePacket(temp.getData(), temp.getDestAddr(), temp.getSqnc(), temp.getType(), temp.getRetry(), temp.getSqnc()));
-			}
-			dQueue = next;
-			sWindow = new LinkedList<byte[]>();
 		}
 
 		// busy channel helper
@@ -388,7 +408,10 @@ public class LinkLayer implements Dot11Interface {
 		void sCase(){
 			nWait();
 			if(theRF.transmit(dQueue.peek())== dQueue.peek().length){//if packet sends properly
-				sWindow.offer(dQueue.poll());//add to sliding window
+				
+				byte[] temp =dQueue.poll();
+				sWindow.offer(temp);//add to sliding window
+				rWatch.put(temp, 0);//start watching retries
 				currentState = State.IDLE;//return to base state
 			}
 			else
@@ -408,21 +431,39 @@ public class LinkLayer implements Dot11Interface {
 		//update helper -- need to have code that causes update state check priorities.
 		void uCase(){
 			//TODO this
-			for(byte[] pack: rQueue)
+			while(!cQueue.isEmpty())//process the accummulated acks
 			{
-				Packet target = new Packet(pack);
-				for(byte[] slot : sWindow)
+				Packet target = new Packet(cQueue.poll());//make ack data reachable
+				for(byte[] slot : sWindow)//check what was acked
 				{
-					Packet p = new Packet(slot);
+					Packet p = new Packet(slot);//test if this was acked
 					if(p.getDestAddr()==target.getSrcAddr()&&p.getSqnc()<=target.getSqnc())
 					{
-						sWindow.remove(p);
+						dPrint(sWindow.remove(slot)+" on sWindow removal");//remove acked packet -- testing message
+						Short[] nSeq = sequence.get(p.getDestAddr());
+						if(nSeq[1] < p.getSqnc())
+						{
+							//error, got ack for seq greater than highest sent
+						}
+						else if (p.getSqnc()< nSeq[0]) // ack on confirmed packet
+						{
+							;//do nothing
+						}
+						else
+						{
+							nSeq[0] = p.getSqnc(); // update last confirmed sequence #
+						}
+						//update sequence info
+						sequence.put(p.getDestAddr(),nSeq);
 					}
 				}
+				synchronized(dQueue){//make sure dQueue isnt being edited while replacing
+					sWindow.addAll(dQueue);
+					dQueue = sWindow; //lazy way to avoid incrementing retry when unwarranted
+				}
 			}
-			if(false){//need checks to see which state to return to
-				currentState=State.TRYSEND;
-			}
+			update();//reform sliding window -- in practice, throw away sliding window
+			currentState = State.IDLE;
 		}
 	}
 	/**
@@ -452,9 +493,17 @@ public class LinkLayer implements Dot11Interface {
 				}
 				//fix this when switch to array
 				Packet temp = new Packet(theRF.receive());
+				dPrint(temp.getDestAddr()+"");
 				if(temp.getDestAddr() == ourMAC||temp.getDestAddr()==-1){
 					//check if wanted packet
-					if(temp.getType()== Beacon)
+					dPrint(temp.getCRC()+"");
+					dPrint(Packet.validate(temp)+"");
+					dPrint(Packet.validate(temp)+"");
+					if(!Packet.validate(temp))
+					{
+						//do nothing if crc bad?
+					}
+					else if(temp.getType()== Beacon)
 					{
 
 					}
@@ -470,7 +519,8 @@ public class LinkLayer implements Dot11Interface {
 								}
 
 							//code for sequence number checking
-							case ACK:cQueue.offer(temp.pack); //code for updating sliding window
+							case ACK: dPrint("got an ack");
+								cQueue.offer(temp.pack); //code for updating sliding window
 						}
 					}
 				}
