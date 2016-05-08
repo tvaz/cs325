@@ -16,7 +16,7 @@ public class LinkLayer implements Dot11Interface {
 	private short ourMAC;       // Our MAC address
 	private PrintWriter output; // The output stream we'll write to
 	/* constant for debug purposes, how often code checks for changes*/
-	static final short FRESHRATE = 100; //refresh interval
+	static final short FRESHRATE = 10; //refresh interval
 	/* Constants for packet types*/
 	private static final short DATAC = 0x00;
 	private static final short ACK = 0x01;
@@ -24,6 +24,7 @@ public class LinkLayer implements Dot11Interface {
 	//private static final short CTS = 0x03;
 	//private static final short RTS = 0x04;
 	private static final int DIFS = RF.aSIFSTime*2;
+	private static int BUFFERSIZE = 4;
 	/**/
 
 	Queue<byte[]> sWindow;//sliding window
@@ -96,7 +97,7 @@ public class LinkLayer implements Dot11Interface {
 	 */
 	//actually prepares data for send and transfers reliability responsibility
 	public int send(short dest, byte[] data, int len) {
-		synchronized(dQueue){if(dQueue.size()+sWindow.size()>3)//make sure code isnt mid-update before calculating size
+		synchronized(dQueue){if(dQueue.size()+sWindow.size()>=BUFFERSIZE)//make sure code isnt mid-update before calculating size
 		{
 			return 0;
 		}}
@@ -112,7 +113,7 @@ public class LinkLayer implements Dot11Interface {
 	 * Recv method blocks until data arrives, then writes it an address info into
 	 * the Transmission object.  See docs for full description.
 	 */
-	public int recv(Transmission t) {	//TODO: Finish implementing the incrementing of sequence numbers
+	public int recv(Transmission t) {
 		//TODO: all this
 		while(rQueue.isEmpty())
 		{
@@ -231,7 +232,7 @@ public class LinkLayer implements Dot11Interface {
 	class FSM implements Runnable{
 		State currentState;
 		int sDelay;//current delay range for waiting to send;
-		static final long TOPERIOD = 1000; //time out period
+		static final long TOPERIOD = 2000; //time out period
 		long timeout; //time from which timeout is calculated
 		HashMap<byte[],Integer> rWatch;
 
@@ -246,7 +247,7 @@ public class LinkLayer implements Dot11Interface {
 			while(true)
 			{
 				//timeout code
-				if( timeout>=0 && theRF.clock()-timeout>TOPERIOD)
+				if((theRF.clock()-timeout)>TOPERIOD)
 				{
 					update();
 				}
@@ -270,7 +271,7 @@ public class LinkLayer implements Dot11Interface {
 						{
 							//set status 2
 						}
-						timeout = -1;
+						timeout = theRF.clock();
 						break;
 					}
 				case WANTSEND1:
@@ -299,27 +300,31 @@ public class LinkLayer implements Dot11Interface {
 		void update(){
 			synchronized(dQueue){// no adding to dqueue while this goes on, sWindow shouldn't matter if in this method
 				//new send queue
+				dPrint("Processing an update");
 				Queue<byte[]> next = new LinkedList<byte[]>();
 				for(byte[] pack: sWindow)
 				{
 					Packet temp = new Packet(pack);// make old packet's data accessible
+					dPrint("Retry: "+ rWatch.get(pack) +'/'+ RF.dot11RetryLimit);
 					if(rWatch.get(pack)>=RF.dot11RetryLimit)//too many retries
 					{
-						;// don't add to new sliding window
+						rWatch.remove(pack);// don't add to new sliding window
 					}
 					//resend if not at retry limit
 					else{
+						dPrint("resending to "+temp.getDestAddr());
 						byte[] t = Packet.generatePacket(temp.getData(), temp.getDestAddr(), temp.getSqnc(), temp.getType(), true, temp.getSqnc());
 						next.offer(t);
 						rWatch.put(t, (rWatch.get(pack)+1));
+						dPrint((rWatch.get(t))+"");
 					}
-					rWatch.remove(pack);
 				}
 				//put all the ToSend stuff back
 				next.addAll(dQueue);
 				//replace the old queues
-				dQueue = next;
-				sWindow = new LinkedList<byte[]>();
+				dQueue.clear();
+				dQueue.addAll(next);
+				sWindow.clear();;
 				//reset timer
 				timeout = theRF.clock();
 			}
@@ -346,7 +351,7 @@ public class LinkLayer implements Dot11Interface {
 			{
 				try{//defer access, difs wait
 					synchronized(this){
-						wait(DIFS);
+						wait(DIFS+(theRF.clock()%50));
 					}
 				}
 				catch(InterruptedException e)
@@ -408,10 +413,12 @@ public class LinkLayer implements Dot11Interface {
 		void sCase(){
 			nWait();
 			if(theRF.transmit(dQueue.peek())== dQueue.peek().length){//if packet sends properly
-				
-				byte[] temp =dQueue.poll();
+				dPrint("Sent a Packet");
+				byte[] temp = dQueue.poll();
 				sWindow.offer(temp);//add to sliding window
-				rWatch.put(temp, 0);//start watching retries
+				int rTry = 0;
+				if(rWatch.containsKey(temp))rTry = rWatch.get(temp);
+				rWatch.put(temp, rTry);//start watching retries
 				currentState = State.IDLE;//return to base state
 			}
 			else
@@ -459,11 +466,12 @@ public class LinkLayer implements Dot11Interface {
 				}
 				synchronized(dQueue){//make sure dQueue isnt being edited while replacing
 					sWindow.addAll(dQueue);
-					dQueue = sWindow; //lazy way to avoid incrementing retry when unwarranted
+					dQueue.clear();
+					dQueue.addAll(sWindow); //lazy way to avoid incrementing retry when unwarranted
+					sWindow.clear();
 				}
 			}
 			update();//reform sliding window -- in practice, throw away sliding window
-			currentState = State.IDLE;
 		}
 	}
 	/**
@@ -497,17 +505,15 @@ public class LinkLayer implements Dot11Interface {
 				if(temp.getDestAddr() == ourMAC||temp.getDestAddr()==-1){
 					//check if wanted packet
 					dPrint(temp.getCRC()+"");
-					dPrint(Packet.validate(temp)+"");
-					dPrint(Packet.validate(temp)+"");
 					if(!Packet.validate(temp))
 					{
-						//do nothing if crc bad?
+						dPrint("Got a bad packet");//do nothing if crc bad?
 					}
 					else if(temp.getType()== Beacon)
 					{
 
 					}
-					else if (rQueue.size()>3)
+					else if (rQueue.size()>+BUFFERSIZE)
 					{
 
 					}
@@ -516,6 +522,15 @@ public class LinkLayer implements Dot11Interface {
 							case DATAC:
 								{
 									rQueue.offer(temp.pack);
+									if(temp.getDestAddr()==-1)break;//don't ack broadcast packets
+									//else
+									try{synchronized(this){wait(RF.aSIFSTime);}}
+									catch(InterruptedException e)
+									{
+										
+									}
+									//ack -- no data, reverse destination, change packet type,acks don't retry, copy sequence #
+									theRF.transmit(Packet.generatePacket(new byte[]{}, temp.getSrcAddr(), ourMAC, ACK, false, temp.getSqnc()));
 								}
 
 							//code for sequence number checking
