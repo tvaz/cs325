@@ -1,5 +1,6 @@
 package wifi;
 import java.io.PrintWriter;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.HashMap;
 import java.util.Queue;
@@ -25,6 +26,7 @@ public class LinkLayer implements Dot11Interface {
 	//private static final short RTS = 0x04;
 	private static final int DIFS = RF.aSIFSTime*2;
 	private static int BUFFERSIZE = 4;
+	long cOffset; //clock offset, for beacons
 	/**/
 
 	Queue<byte[]> sWindow;//sliding window
@@ -59,6 +61,7 @@ public class LinkLayer implements Dot11Interface {
 		this.output = output;
 		theRF = new RF(output, null);
 		dPrint("LinkLayer: Constructor ran.");
+		cOffset = 0;
 		sWindow = (Queue<byte[]>) new LinkedList<byte[]>();
 		dQueue = (Queue<byte[]>) new LinkedList<byte[]>();
 		rQueue = (Queue<byte[]>) new LinkedList<byte[]>();
@@ -71,6 +74,11 @@ public class LinkLayer implements Dot11Interface {
 		watcher.start();
 		fState.start();
 	}
+	//for clock synch, beacons
+	private long clock(){
+		return theRF.clock() + cOffset;
+	}
+	
 	//returns next sequence number for the given destination address -- maybe unnecessary
 	private short seqCheck(short addr)
 	//TODO: Finish implementing the incrementing of sequence numbers
@@ -96,7 +104,17 @@ public class LinkLayer implements Dot11Interface {
 	 *
 	 */
 	//actually prepares data for send and transfers reliability responsibility
-	public int send(short dest, byte[] data, int len) {
+	public int send(short dest, byte[] source, int len) {
+		int leng = len;
+		if (leng > source.length)//cutoff if len longer than actual data
+		{
+			leng = source.length;
+		}
+		if(leng > 2038)//cutoff if data > packet max;
+		{
+			leng  = 2038;
+		}
+		byte[] data = Arrays.copyOfRange(source, 0, leng);
 		synchronized(dQueue){if(dQueue.size()+sWindow.size()>=BUFFERSIZE)//make sure code isnt mid-update before calculating size
 		{
 			return 0;
@@ -351,7 +369,7 @@ public class LinkLayer implements Dot11Interface {
 			{
 				try{//defer access, difs wait
 					synchronized(this){
-						wait(DIFS+(theRF.clock()%50));
+						wait(DIFS+(50-(theRF.clock()%50)));
 					}
 				}
 				catch(InterruptedException e)
@@ -523,14 +541,15 @@ public class LinkLayer implements Dot11Interface {
 								{
 									rQueue.offer(temp.pack);
 									if(temp.getDestAddr()==-1)break;//don't ack broadcast packets
-									//else
+									else{
 									try{synchronized(this){wait(RF.aSIFSTime);}}
 									catch(InterruptedException e)
 									{
 										
 									}
 									//ack -- no data, reverse destination, change packet type,acks don't retry, copy sequence #
-									theRF.transmit(Packet.generatePacket(new byte[]{}, temp.getSrcAddr(), ourMAC, ACK, false, temp.getSqnc()));
+									dPrint("sending Ack");
+									theRF.transmit(Packet.generatePacket(new byte[]{}, temp.getSrcAddr(), ourMAC, ACK, false, temp.getSqnc()));}
 								}
 
 							//code for sequence number checking
