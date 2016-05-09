@@ -17,24 +17,25 @@ public class LinkLayer implements Dot11Interface {
 	private short ourMAC;       // Our MAC address
 	private PrintWriter output; // The output stream we'll write to
 	/* constant for debug purposes, how often code checks for changes*/
-	static final short FRESHRATE = 10; //refresh interval
+	static final short FRESHRATE = 10;
 	/* Constants for packet types*/
 	private static final short DATAC = 0x00;
 	private static final short ACK = 0x01;
 	private static final short Beacon = 0x02;
+	//unimplemented
 	//private static final short CTS = 0x03;
 	//private static final short RTS = 0x04;
-	private static final int DIFS = RF.aSIFSTime*2;
-	private static int BUFFERSIZE = 4;
+	private static final int DIFS = RF.aSIFSTime*2;//timing constant
+	private static int BUFFERSIZE = 4;//buffer limit
 	long cOffset; //clock offset, for beacons
 	/**/
 
 	Queue<byte[]> sWindow;//sliding window
 	private Queue<byte[]> dQueue; //send data queue
-	
-	// size 3 array [last acked sqnc#,last sent sqnc#,sqnc# of last packet from this addr(for receives)]
-	private HashMap<Short,Short[]> sequence; 
-	
+
+	// size 3 array [last acked sqnc#,last sent sqnc#,sqnc# of last packet from this addr(for sequence checking receives--unused)]
+	private HashMap<Short,Short[]> sequence;
+
 	//Enumerated states for internal FSM
 	enum State{IDLE,WANTSEND1,WANTSEND2,TRYSEND,MUSTWAIT,TRYUPDATE}
 
@@ -57,6 +58,7 @@ public class LinkLayer implements Dot11Interface {
 	 * @param output  Output stream associated with GUI
 	 */
 	public LinkLayer(short ourMAC, PrintWriter output) {
+		//instantiate variables
 		this.ourMAC = ourMAC;
 		this.output = output;
 		theRF = new RF(output, null);
@@ -76,26 +78,31 @@ public class LinkLayer implements Dot11Interface {
 	}
 	//for clock synch, beacons
 	private long clock(){
-		return theRF.clock() + cOffset;
+		long ret =theRF.clock() + cOffset;
+		dPrint("Current clock checked : " + ret);
+		return ret;
 	}
-	
+
 	//returns next sequence number for the given destination address -- maybe unnecessary
 	private short seqCheck(short addr)
 	//TODO: Finish implementing the incrementing of sequence numbers
+	//does not reuse sequence numbers that hit retry limit, and does not roll over
 	{
 		if(sequence.get(addr)==null){
 			sequence.put(addr, new Short[]{0,0,-1});
+			dPrint("Sequence info for: "+addr+'\t'+ sequence.get(addr));
 			return 0;
 		}
 		else{
-			dPrint(""+sequence.get(addr)[0] + '\t' + sequence.get(addr)[1] + '\t' );
-			return sequence.get(addr)[1];
+			short n = sequence.get(addr)[1];
+			sequence.put(addr, new Short[]{sequence.get(addr)[0],++n});
+			dPrint("Sequence info for: "+addr+'\t'+ sequence.get(addr));
+			return n;
 		}
 	}
 
 	//Print method that checks the debug level before deciding to print
 	private void dPrint(String s){
-		//TODO: add more debug print statements throughout the code
 		if(debug != 0)output.println(s);
 	}
 
@@ -120,9 +127,12 @@ public class LinkLayer implements Dot11Interface {
 		{
 			return 0;
 		}}
-		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
+		Packet p = new Packet(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
+		Packet.printDebug(p,1);
+		dPrint("Queued up packet of size" + data.length + "\tto\t"+p.getDestAddr());
+		dQueue.offer(p.pack);
 		Short[] nSeq = sequence.get(dest);
-		++nSeq[1];
+		nSeq[1]=p.getSqnc();
 		sequence.put(dest,nSeq);
 		//fake confirm of data sent, true to actual except when unanticipated queue error occurs
 		return data.length;
@@ -145,6 +155,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 		}
 		Packet temp = new Packet(rQueue.poll());
+		dPrint("Receiving packet " + temp.getSqnc() + " from " + temp.getSrcAddr());
 		t.setBuf(temp.getData());
 		t.setDestAddr(temp.getDestAddr());
 		t.setSourceAddr(temp.getSrcAddr());
@@ -268,6 +279,7 @@ public class LinkLayer implements Dot11Interface {
 				//timeout code
 				if((theRF.clock()-timeout)>TOPERIOD)
 				{
+					dPrint("\nTimeout has occured\n");
 					update();
 				}
 				//wait here if necessary
@@ -276,11 +288,12 @@ public class LinkLayer implements Dot11Interface {
 				case IDLE://sleep till something changes-- also base state, used when next action is ambiguous
 					if(!cQueue.isEmpty())
 					{
+						dPrint("Exiting Idle State");
 						currentState = State.TRYUPDATE;
-
 					}
 					else if(!dQueue.isEmpty())
 					{
+						dPrint("Exiting Idle State");
 						currentState = State.WANTSEND1;
 					}
 					else{
@@ -291,8 +304,8 @@ public class LinkLayer implements Dot11Interface {
 							//set status 2
 						}
 						timeout = theRF.clock();
-						break;
 					}
+					break;
 				case WANTSEND1:
 					wCase();
 					break;
@@ -309,17 +322,16 @@ public class LinkLayer implements Dot11Interface {
 					uCase();
 					break;
 				}
-				
-				
+
+
 			}
 		}
 		/* private helper, handles retry limit*/
-				
+
 		/* function to process refreshing sliding window, could use optimization time permitting*/
 		void update(){
 			synchronized(dQueue){// no adding to dqueue while this goes on, sWindow shouldn't matter if in this method
 				//new send queue
-				dPrint("Processing an update");
 				Queue<byte[]> next = new LinkedList<byte[]>();
 				for(byte[] pack: sWindow)
 				{
@@ -327,12 +339,15 @@ public class LinkLayer implements Dot11Interface {
 					dPrint("Retry: "+ rWatch.get(pack) +'/'+ RF.dot11RetryLimit);
 					if(rWatch.get(pack)>=RF.dot11RetryLimit)//too many retries
 					{
+						dPrint("Packet to "+ temp.getDestAddr() +" has reached retransission limit -- discarding packet");
 						rWatch.remove(pack);// don't add to new sliding window
 					}
 					//resend if not at retry limit
 					else{
-						dPrint("resending to "+temp.getDestAddr());
-						byte[] t = Packet.generatePacket(temp.getData(), temp.getDestAddr(), temp.getSqnc(), temp.getType(), true, temp.getSqnc());
+						dPrint("resending packet "+ temp.getSqnc() +" to "+temp.getDestAddr());
+						byte[] t = Packet.generatePacket(temp.getData(), temp.getDestAddr(), ourMAC, temp.getType(), true, temp.getSqnc());
+						Packet p = new Packet(t);
+						Packet.printDebug(p,2);
 						next.offer(t);
 						rWatch.put(t, (rWatch.get(pack)+1));
 						dPrint((rWatch.get(t))+"");
@@ -386,7 +401,7 @@ public class LinkLayer implements Dot11Interface {
 		{
 			int next = sDelay;
 			if (next == RF.aCWmin) return;//first try should be 1 persistent, no wait besides difs
-			if(slotMode == 0){
+			if(slotMode == 0){//if set to slot mode 0, use random slot interval instead of forced max backoff
 				next = (int)(Math.random()*next);
 			}
 			try{
@@ -546,12 +561,14 @@ public class LinkLayer implements Dot11Interface {
 									try{synchronized(this){wait(RF.aSIFSTime);}}
 									catch(InterruptedException e)
 									{
-										
+
 									}
 									//ack -- no data, reverse destination, change packet type,acks don't retry, copy sequence #
 									dPrint("sending Ack");
-									theRF.transmit(Packet.generatePacket(new byte[]{}, temp.getSrcAddr(), ourMAC, ACK, false, temp.getSqnc()));}
-									break;
+									Packet p = new Packet(Packet.generatePacket(new byte[]{}, temp.getSrcAddr(), ourMAC, ACK, false, temp.getSqnc()));
+									Packet.printDebug(p,3);
+									theRF.transmit(p.pack);
+									}
 								}
 
 							//code for sequence number checking
