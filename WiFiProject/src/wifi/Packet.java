@@ -22,6 +22,7 @@ class Packet {
 	**/
 	public static byte[] generatePacket(byte[] src, short dest, short home, short type, boolean retry, short seq)
 	{
+		System.out.println("Making a Packet with destination: " + dest + " sequence number: " + seq);
 		//Control, then Dest Addr, then Src Addr, the Data, and Checksum
 		// [2][2][2][0-2038][4] Bytes
 		// Control : Frame Type, Retry, Sequence [3][1][12] Bits
@@ -32,7 +33,7 @@ class Packet {
 
 		// get control from type
 		byte control = (byte) (type << 5);
-		if(retry) control |= 8;
+		if(retry) control |= 16;
 		control |= (byte) ((seq<<4)>>12);
 		packet[0] = control;
 		packet[1] = (byte)(seq & 0xff);
@@ -69,7 +70,7 @@ class Packet {
 	}
 	public boolean getRetry()
 	{
-		boolean retry = (8 & pack[0])>0;
+		boolean retry = (16 & pack[0])>0;
 		System.out.println("retry: "+retry);
 		return retry;
 	}

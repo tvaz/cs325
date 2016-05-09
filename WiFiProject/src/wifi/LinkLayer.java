@@ -129,7 +129,7 @@ public class LinkLayer implements Dot11Interface {
 		}}
 		Packet p = new Packet(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
 		Packet.printDebug(p,1);
-		dPrint("Queued up packet of size" + data.length + "\tto\t"+p.getDestAddr());
+		dPrint("Queued up packet of size " + data.length + " to "+p.getDestAddr());
 		dQueue.offer(p.pack);
 		Short[] nSeq = sequence.get(dest);
 		nSeq[1]=p.getSqnc();
@@ -269,7 +269,7 @@ public class LinkLayer implements Dot11Interface {
 		public FSM(){
 			currentState = State.IDLE;
 			rWatch = new HashMap<byte[],Integer>();
-			timeout = -1;
+			timeout = theRF.clock();
 		}
 		public void run(){
 			//TODO needs update code
@@ -344,7 +344,7 @@ public class LinkLayer implements Dot11Interface {
 					}
 					//resend if not at retry limit
 					else{
-						dPrint("resending packet "+ temp.getSqnc() +" to "+temp.getDestAddr());
+						dPrint("Resending packet "+ temp.getSqnc() +" to "+temp.getDestAddr());
 						byte[] t = Packet.generatePacket(temp.getData(), temp.getDestAddr(), ourMAC, temp.getType(), true, temp.getSqnc());
 						Packet p = new Packet(t);
 						Packet.printDebug(p,2);
@@ -406,7 +406,7 @@ public class LinkLayer implements Dot11Interface {
 			}
 			try{
 				synchronized(this){
-					wait(next);
+					wait(next+(50 -(theRF.clock()%50)));
 				}
 			}
 			catch(InterruptedException e)
@@ -417,7 +417,7 @@ public class LinkLayer implements Dot11Interface {
 		//idle channel helper
 		void wCase(){
 			try{
-				synchronized(this){wait(DIFS);}
+				synchronized(this){wait(DIFS+(50-(theRF.clock()%50)));}
 			}
 
 			catch(InterruptedException e)
@@ -453,6 +453,7 @@ public class LinkLayer implements Dot11Interface {
 				int rTry = 0;
 				if(rWatch.containsKey(temp))rTry = rWatch.get(temp);
 				rWatch.put(temp, rTry);//start watching retries
+				dPrint("Completed a send, returning to base state");
 				currentState = State.IDLE;//return to base state
 			}
 			else
@@ -463,6 +464,7 @@ public class LinkLayer implements Dot11Interface {
 				}
 				else{
 					sDelay+=sDelay;//double collision window
+					dPrint("Encountered collision, updating collision window");
 					if(sDelay > RF.aCWmax)sDelay = RF.aCWmax;// cap at maximum collision window size
 				}
 			}
@@ -475,6 +477,7 @@ public class LinkLayer implements Dot11Interface {
 			while(!cQueue.isEmpty())//process the accummulated acks
 			{
 				Packet target = new Packet(cQueue.poll());//make ack data reachable
+				dPrint("Processing ack for packet "+ target.getSqnc()+ " to " + target.getDestAddr());
 				for(byte[] slot : sWindow)//check what was acked
 				{
 					Packet p = new Packet(slot);//test if this was acked
@@ -495,7 +498,8 @@ public class LinkLayer implements Dot11Interface {
 						}
 						//update sequence info
 						sequence.put(p.getDestAddr(),nSeq);
-						dPrint(sWindow.remove(slot)+" on sWindow removal");//remove acked packet -- testing message
+						dPrint("Removing ACKed packet " + p.getSqnc() + " to " + p.getDestAddr()+ " from sliding window");
+						dPrint(sWindow.remove(slot)+" on removal from sWindow");//remove acked packet -- testing message
 					}
 				}
 				synchronized(dQueue){//make sure dQueue isnt being edited while replacing
@@ -505,6 +509,7 @@ public class LinkLayer implements Dot11Interface {
 					sWindow.clear();
 				}
 			}
+			dPrint("Refreshing sliding window with " + dQueue.size() + " remaining transmissions");
 			update();//reform sliding window -- in practice, throw away sliding window
 		}
 	}
@@ -566,14 +571,17 @@ public class LinkLayer implements Dot11Interface {
 									//ack -- no data, reverse destination, change packet type,acks don't retry, copy sequence #
 									dPrint("sending Ack");
 									Packet p = new Packet(Packet.generatePacket(new byte[]{}, temp.getSrcAddr(), ourMAC, ACK, false, temp.getSqnc()));
+									dPrint("Sending ACK to " + p.getDestAddr() + " for packet "+ p.getSqnc());
 									Packet.printDebug(p,3);
 									theRF.transmit(p.pack);
 									}
+									break;
 								}
 
 							//code for sequence number checking
-							case ACK: dPrint("got an ack");
-								dPrint(""+cQueue.offer(temp.pack)); //code for updating sliding window
+							case ACK: 
+								dPrint("Received an ACK for packet " + temp.getSqnc() + " to " + temp.getSrcAddr());
+								cQueue.offer(temp.pack); //code for updating sliding window
 						}
 					}
 				}
