@@ -149,10 +149,7 @@ public class LinkLayer implements Dot11Interface {
 		Packet p = new Packet(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
 		Packet.printDebug(p,1);
 		dPrint("Queued up packet of size " + data.length + " to "+p.getDestAddr());
-		dQueue.offer(p.pack);/*
-		Short[] nSeq = sequence.get(dest);
-		nSeq[1]=p.getSqnc();
-		sequence.put(dest,nSeq);*/
+		dQueue.offer(p.pack);
 		//fake confirm of data sent, true to actual except when unanticipated queue error occurs
 		return data.length;
 
@@ -162,7 +159,6 @@ public class LinkLayer implements Dot11Interface {
 	 * the Transmission object.  See docs for full description.
 	 */
 	public int recv(Transmission t) {
-		//TODO: all this
 		while(rQueue.isEmpty())
 		{
 			try{
@@ -188,8 +184,6 @@ public class LinkLayer implements Dot11Interface {
 	// 1 - success - 2 - unspecified error - 3 - RF init fail - 4 - last transm acked - 5 - last transm discarded
 	//  6 - bad buf. size - 7 - bad addr. - 8 - bad mac - 9 - illegal arg - 10 - insuf. buffer
 	public int status() {
-		//TODO: update status codes properly in error handling
-		//dPrint("LinkLayer: Faking a status() return value of 0");
 		return status;
 	}
 
@@ -292,8 +286,6 @@ public class LinkLayer implements Dot11Interface {
 			timeout = clock();
 		}
 		public void run(){
-			//TODO needs update code
-			//Run stuff
 			while(true)
 			{
 				//timeout code
@@ -302,7 +294,6 @@ public class LinkLayer implements Dot11Interface {
 					dPrint("\nTimeout has occured\n");
 					update();
 				}
-				//wait here if necessary
 				synchronized(this){
 				switch(currentState)
 				{
@@ -318,7 +309,6 @@ public class LinkLayer implements Dot11Interface {
 						currentState = State.WANTSEND1;
 					}
 					else{
-						//can change time if decide to use notifies;
 						try{Thread.sleep(FRESHRATE);}
 						catch(InterruptedException e)
 						{
@@ -347,7 +337,6 @@ public class LinkLayer implements Dot11Interface {
 
 			}
 		}
-		/* private helper, handles retry limit*/
 
 		/* function to process refreshing sliding window, could use optimization time permitting*/
 		void update(){
@@ -542,7 +531,6 @@ public class LinkLayer implements Dot11Interface {
 					dQueue= new LinkedList<byte[]>();
 					dQueue.addAll(sWindow); //lazy way to avoid incrementing retry when unwarranted
 					sWindow.clear();
-					//dPrint("Refreshing sliding window with " + dQueue.size() + " remaining transmissions");
 					update();//reform sliding window -- in practice, throw away sliding window
 				
 			}
@@ -564,7 +552,6 @@ public class LinkLayer implements Dot11Interface {
 		Rcver()
 		{
 		}
-		//might include code specifically for grabbing/compressing acks
 
 		public void run()
 		{
@@ -579,14 +566,12 @@ public class LinkLayer implements Dot11Interface {
 						status = 2;
 					}
 				}
-				//fix this when switch to array
 				Packet temp = new Packet(theRF.receive());
 				if(temp.getDestAddr() == ourMAC||temp.getDestAddr()==-1){
 					//check if wanted packet
 					if(!Packet.validate(temp))
 					{
-						//might be bugged, this gets called a lot on bcast packets, not sure which types
-						dPrint("Got a bad packet");//do nothing if crc bad?
+						dPrint("Got a bad packet");//do nothing if crc bad
 					}
 					else if(temp.getType()== Beacon)
 					{
