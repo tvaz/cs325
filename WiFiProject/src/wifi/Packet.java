@@ -64,9 +64,12 @@ class Packet {// adding this here so git will let me commit
 	{
 		//return sequence #
 		byte t = (byte)(pack[0]&0x0f);
-		short t2 =(short) (t<<8+(pack[1]&0xFF));
-		System.out.println("getsqnc: "+t2);
-		return t2;
+		ByteBuffer buf = ByteBuffer.allocate(Short.BYTES);
+	    byte[] check = new byte[]{t,pack[1]};
+	    buf.put(check);
+	      buf.flip();
+	      short crc_long = buf.getShort();
+		return crc_long;
 	}
 	public boolean getRetry()
 	{
@@ -114,7 +117,14 @@ class Packet {// adding this here so git will let me commit
 	      long crc_long = buf.getInt();
 		return crc_long;
 	}
-
+	public static long beaconCheck(byte[] packet){
+		ByteBuffer buf = ByteBuffer.allocate(Long.BYTES);
+	    byte[] check = Arrays.copyOfRange(packet,6,packet.length-4);
+	    buf.put(check);
+	      buf.flip();
+	      long crc_long = buf.getLong();
+		return crc_long;
+	}
 	public static boolean validate(Packet p)//compare wrapper packet against created packet for same crc
 	{
 
