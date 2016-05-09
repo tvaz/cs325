@@ -31,10 +31,10 @@ public class LinkLayer implements Dot11Interface {
 
 	Queue<byte[]> sWindow;//sliding window
 	private Queue<byte[]> dQueue; //send data queue
-	
+
 	// size 3 array [last acked sqnc#,last sent sqnc#,sqnc# of last packet from this addr(for receives)]
-	private HashMap<Short,Short[]> sequence; 
-	
+	private HashMap<Short,Short[]> sequence;
+
 	//Enumerated states for internal FSM
 	enum State{IDLE,WANTSEND1,WANTSEND2,TRYSEND,MUSTWAIT,TRYUPDATE}
 
@@ -78,7 +78,7 @@ public class LinkLayer implements Dot11Interface {
 	private long clock(){
 		return theRF.clock() + cOffset;
 	}
-	
+
 	//returns next sequence number for the given destination address -- maybe unnecessary
 	private short seqCheck(short addr)
 	//TODO: Finish implementing the incrementing of sequence numbers
@@ -88,13 +88,14 @@ public class LinkLayer implements Dot11Interface {
 			return 0;
 		}
 		else{
-			return sequence.get(addr)[1];
+			short n = sequence.get(addr)[1];
+			sequence.put(addr, new Short[]{sequence.get(addr)[0],++n});
+			return n;
 		}
 	}
 
 	//Print method that checks the debug level before deciding to print
 	private void dPrint(String s){
-		//TODO: add more debug print statements throughout the code
 		if(debug != 0)output.println(s);
 	}
 
@@ -119,7 +120,9 @@ public class LinkLayer implements Dot11Interface {
 		{
 			return 0;
 		}}
-		dQueue.offer(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
+		Packet p = new Packet(Packet.generatePacket(data,dest,ourMAC,DATAC,false,seqCheck(dest)));
+		Packet.printDebug(p,1);
+		dQueue.offer(p.pack);
 		Short[] nSeq = sequence.get(dest);
 		++nSeq[1];
 		sequence.put(dest,nSeq);
@@ -308,12 +311,12 @@ public class LinkLayer implements Dot11Interface {
 					uCase();
 					break;
 				}
-				
-				
+
+
 			}
 		}
 		/* private helper, handles retry limit*/
-				
+
 		/* function to process refreshing sliding window, could use optimization time permitting*/
 		void update(){
 			synchronized(dQueue){// no adding to dqueue while this goes on, sWindow shouldn't matter if in this method
@@ -331,7 +334,9 @@ public class LinkLayer implements Dot11Interface {
 					//resend if not at retry limit
 					else{
 						dPrint("resending to "+temp.getDestAddr());
-						byte[] t = Packet.generatePacket(temp.getData(), temp.getDestAddr(), temp.getSqnc(), temp.getType(), true, temp.getSqnc());
+						byte[] t = Packet.generatePacket(temp.getData(), temp.getDestAddr(), ourMAC, temp.getType(), true, temp.getSqnc());
+						Packet p = new Packet(t);
+						Packet.printDebug(p,2);
 						next.offer(t);
 						rWatch.put(t, (rWatch.get(pack)+1));
 						dPrint((rWatch.get(t))+"");
@@ -545,11 +550,14 @@ public class LinkLayer implements Dot11Interface {
 									try{synchronized(this){wait(RF.aSIFSTime);}}
 									catch(InterruptedException e)
 									{
-										
+
 									}
 									//ack -- no data, reverse destination, change packet type,acks don't retry, copy sequence #
 									dPrint("sending Ack");
-									theRF.transmit(Packet.generatePacket(new byte[]{}, temp.getSrcAddr(), ourMAC, ACK, false, temp.getSqnc()));}
+									Packet p = new Packet(Packet.generatePacket(new byte[]{}, temp.getSrcAddr(), ourMAC, ACK, false, temp.getSqnc()));
+									Packet.printDebug(p,3);
+									theRF.transmit(p.pack);
+									}
 								}
 
 							//code for sequence number checking

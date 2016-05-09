@@ -52,19 +52,20 @@ class Packet {
 	    packet[packet.length-1] = (byte)(check.getValue());
 
 		System.out.println("Computed CRC: "+convCrcToLong(packet));
-
+		System.out.println("Generated a packet:");
 
 		//checksum goes here
-	    System.out.println("" + packet[0] + '\t' +packet[1] + '\t'+packet[2] + '\t' + packet[3]+ '\t'+packet[4] + '\t' + packet[5] );
+	    //System.out.println("" + packet[0] + '\t' +packet[1] + '\t'+packet[2] + '\t' + packet[3]+ '\t'+packet[4] + '\t' + packet[5] );
 	    return packet;
 	}
 
 	public short getSqnc()
 	{
 		//return sequence #
-		short t=(short)(pack[0] & 0x0f);
-		System.out.println("getsqnc: "+t);
-		return (short)((t<<8) + pack[1]);
+		byte t = (byte)(pack[0]&0x0f);
+		short t2 =(short) (t<<8+(pack[1]&0xFF));
+		System.out.println("getsqnc: "+t2);
+		return t2;
 	}
 	public boolean getRetry()
 	{
@@ -115,7 +116,33 @@ class Packet {
 
 	public static boolean validate(Packet p)//compare wrapper packet against created packet for same crc
 	{
-		
+
 		return p.getCRC() == new Packet(Packet.generatePacket(p.getData(), p.getDestAddr(), p.getSrcAddr(), p.getType(), p.getRetry(), p.getSqnc())).getCRC();
+	}
+	public static void printDebug(Packet p, int i) {
+		System.out.println("");
+		System.out.println("PRINTING PACKET DEBUG INFO");
+		switch(i){
+		case 1:
+			System.out.println("MAKING A PACKET!");
+			break;
+		case 2:
+			System.out.println("RETRANSMITTING A PACKET!");
+			break;
+		case 3:
+			System.out.println("SENDING AN ACK!");
+		}
+		System.out.println("+++");
+		p.getSrcAddr();
+		p.getDestAddr();
+		p.getData();
+		p.getType();
+		p.getCRC();
+		p.getSqnc();
+		p.getRetry();
+		System.out.println("COMPLETE");
+		System.out.println("");
+
+
 	}
 }
