@@ -88,6 +88,7 @@ public class LinkLayer implements Dot11Interface {
 			return 0;
 		}
 		else{
+			dPrint(""+sequence.get(addr)[0] + '\t' + sequence.get(addr)[1] + '\t' );
 			return sequence.get(addr)[1];
 		}
 	}
@@ -464,7 +465,6 @@ public class LinkLayer implements Dot11Interface {
 					Packet p = new Packet(slot);//test if this was acked
 					if(p.getDestAddr()==target.getSrcAddr()&&p.getSqnc()<=target.getSqnc())
 					{
-						dPrint(sWindow.remove(slot)+" on sWindow removal");//remove acked packet -- testing message
 						Short[] nSeq = sequence.get(p.getDestAddr());
 						if(nSeq[1] < p.getSqnc())
 						{
@@ -480,6 +480,7 @@ public class LinkLayer implements Dot11Interface {
 						}
 						//update sequence info
 						sequence.put(p.getDestAddr(),nSeq);
+						dPrint(sWindow.remove(slot)+" on sWindow removal");//remove acked packet -- testing message
 					}
 				}
 				synchronized(dQueue){//make sure dQueue isnt being edited while replacing
@@ -550,11 +551,12 @@ public class LinkLayer implements Dot11Interface {
 									//ack -- no data, reverse destination, change packet type,acks don't retry, copy sequence #
 									dPrint("sending Ack");
 									theRF.transmit(Packet.generatePacket(new byte[]{}, temp.getSrcAddr(), ourMAC, ACK, false, temp.getSqnc()));}
+									break;
 								}
 
 							//code for sequence number checking
 							case ACK: dPrint("got an ack");
-								cQueue.offer(temp.pack); //code for updating sliding window
+								dPrint(""+cQueue.offer(temp.pack)); //code for updating sliding window
 						}
 					}
 				}
